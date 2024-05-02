@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2023 IBM Corporation
 // SPDX-FileContributor: Wojciech Ozga <woz@zurich.ibm.com>, IBM Research - Zurich
 // SPDX-License-Identifier: Apache-2.0
+#![rr::import("ace.theories.page_table", "page_table")]
 use crate::core::architecture::mmu::page_table::PageTable;
 use crate::core::architecture::SharedPage;
 use crate::core::page_allocator::{Allocated, Page};
@@ -25,6 +26,10 @@ pub(super) enum PageTableEntry {
 }
 
 impl PageTableEntry {
+    #[rr::skip]
+    #[rr::params("x")]
+    #[rr::args("#x")]
+    #[rr::returns("encode_page_table_entry x")]
     pub fn encode(&self) -> usize {
         match self {
             PageTableEntry::PointerToNextPageTable(page_table, configuration) => {
@@ -74,6 +79,9 @@ impl PageTableBits {
         raw_entry & self.mask() != 0
     }
 
+    #[rr::skip]
+    #[rr::args("x")]
+    #[rr::returns("bv_to_bit ")]
     pub const fn is_valid(raw_entry: usize) -> bool {
         Self::Valid.is_set(raw_entry)
     }
@@ -113,6 +121,8 @@ impl PageTablePermission {
         Self { can_read: true, can_write: true, can_execute: false }
     }
 
+    //#[rr::args("x")]
+    //#[rr::returns()]
     pub fn decode(raw_entry: usize) -> Self {
         Self {
             can_read: PageTableBits::Read.is_set(raw_entry),
@@ -149,10 +159,12 @@ pub(super) struct PageTableConfiguration {
 }
 
 impl PageTableConfiguration {
+    #[rr::returns("mk_ptc false false false false")]
     pub fn empty() -> Self {
         Self { is_accessible_to_user: false, was_accessed: false, is_global_mapping: false, is_dirty: false }
     }
 
+    #[rr::returns("mk_ptc true true false true")]
     pub fn shared_page_configuration() -> Self {
         Self { is_accessible_to_user: true, was_accessed: true, is_global_mapping: false, is_dirty: true }
     }
