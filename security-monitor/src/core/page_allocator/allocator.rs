@@ -85,7 +85,7 @@ impl PageAllocator {
     #[rr::ensures(#iris "once_initialized π \"PAGE_ALLOCATOR\" (Some ())")]
     #[rr::returns("Ok(#())")]
     pub unsafe fn initialize(memory_start: ConfidentialMemoryAddress, memory_end: *const usize) -> Result<(), Error> {
-        assure_not!(PAGE_ALLOCATOR.is_completed(), Error::Reinitialization())?;
+        ensure_not!(PAGE_ALLOCATOR.is_completed(), Error::Reinitialization())?;
         let mut page_allocator = Self::empty();
         page_allocator.add_memory_region(memory_start, memory_end)?;
         // NOTE: We initialize the invariant here.
@@ -360,7 +360,8 @@ impl PageStorageTreeNode {
     pub fn acquire_page_token(
         &mut self, this_node_base_address: usize, this_node_page_size: PageSize, page_size_to_acquire: PageSize,
     ) -> Result<Page<UnAllocated>, Error> {
-        assure!(self.max_allocable_page_size >= Some(page_size_to_acquire), Error::OutOfPages())?;
+        //assert!(self.max_allocable_page_size >= Some(page_size_to_acquire));
+        ensure!(self.max_allocable_page_size >= Some(page_size_to_acquire), Error::OutOfPages())?;
         if &this_node_page_size == &page_size_to_acquire {
             // End of recursion, we found the node from which we acquire a page token.
             assert!(self.page_token.is_some());

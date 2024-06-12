@@ -158,7 +158,7 @@ impl PageTable {
     pub fn empty(paging_system: PagingSystem, level: PageTableLevel) -> Result<Self, Error> {
         let serialized_representation = PageAllocator::acquire_page(paging_system.memory_page_size(level))?.zeroize();
         let number_of_entries = serialized_representation.size().in_bytes() / paging_system.entry_size();
-        let logical_representation = (0..number_of_entries).map(|_| PageTableEntry::NotValid).collect();
+        let logical_representation = (0..number_of_entries).map(|_| PageTableEntry::UnmappedPage).collect();
         Ok(Self { level, paging_system, serialized_representation, logical_representation })
     }
 
