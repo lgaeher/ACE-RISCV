@@ -23,6 +23,7 @@
 #![register_tool(rr)]
 #![rr::coq_prefix("sm")]
 #![rr::include("stdlib")]
+#![rr::include("pointers_utility")]
 
 extern crate alloc;
 
