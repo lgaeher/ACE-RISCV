@@ -122,6 +122,10 @@ Record page : Type := mk_page {
   page_sz : page_size;
   page_val : list Z
 }.
+Global Instance loc_eqdec : EqDecision loc.
+Proof. solve_decision. Defined.
+Global Instance loc_countable : Countable loc.
+Proof. unfold loc. apply prod_countable. Qed.
 Global Instance page_inh : Inhabited page.
 Proof. exact (populate (mk_page inhabitant inhabitant inhabitant)). Qed.
 Global Instance page_eqdec : EqDecision page.
@@ -285,7 +289,7 @@ Proof.
   Arguments Nat.mul : simpl never. simpl.
   econstructor.
   - simpl. split.
-    { rewrite take_length -Hlen. lia. }
+    { rewrite length_take -Hlen. lia. }
     { subst words. eapply aligned_to_offset; first done.
       rewrite page_size_align_is_size /page_size_in_bytes_nat.
       rewrite Nat2Z.divide. apply Nat.divide_factor_l. }
@@ -293,7 +297,7 @@ Proof.
     replace (start * words + words)%nat with ((S start) * words)%nat by lia.
     apply (IH (S start)); last done.
     rewrite Nat.mul_succ_l.
-    rewrite -drop_drop drop_length -Hlen.
+    rewrite -drop_drop length_drop -Hlen.
     lia.
 Qed.
 

@@ -2,7 +2,6 @@
 // SPDX-FileContributor: Wojciech Ozga <woz@zurich.ibm.com>, IBM Research - Zurich
 // SPDX-License-Identifier: Apache-2.0
 #![rr::import("ace.theories.page_allocator", "page")]
-#![rr::include("option")]
 
 // The order of page size in this enum must follow the increasing sizes of page to guarantee that the Ord/PartialOrd are correctly derived
 // for the `PageSize`.
@@ -31,9 +30,7 @@ impl PageSize {
     pub const TYPICAL_NUMBER_OF_PAGES_INSIDE_LARGER_PAGE: usize = 512;
 
     #[rr::trust_me]
-    #[rr::params("x")]
-    #[rr::args("#x")]
-    #[rr::returns("page_size_in_bytes_Z x")]
+    #[rr::returns("page_size_in_bytes_Z self")]
     pub fn in_bytes(&self) -> usize {
         match self {
             PageSize::Size128TiB => 8 * 512 * 512 * 512 * 512 * 256,
@@ -45,10 +42,7 @@ impl PageSize {
         }
     }
 
-    #[rr::trust_me]
-    #[rr::params("x")]
-    #[rr::args("#x")]
-    #[rr::returns("<#>@{option} page_size_smaller x")]
+    #[rr::returns("page_size_smaller self")]
     pub fn smaller(&self) -> Option<PageSize> {
         match self {
             PageSize::Size128TiB => Some(PageSize::Size512GiB),
@@ -60,10 +54,7 @@ impl PageSize {
         }
     }
 
-    #[rr::trust_me]
-    #[rr::params("x")]
-    #[rr::args("#x")]
-    #[rr::returns("<#>@{option} page_size_larger x")]
+    #[rr::returns("page_size_larger self")]
     pub fn larger(&self) -> Option<PageSize> {
         match self {
             PageSize::Size128TiB => None,
@@ -75,10 +66,7 @@ impl PageSize {
         }
     }
 
-    #[rr::trust_me]
-    #[rr::params("x")]
-    #[rr::args("#x")]
-    #[rr::returns("page_size_multiplier x")]
+    #[rr::returns("page_size_multiplier self")]
     pub fn number_of_smaller_pages(&self) -> usize {
         match self {
             PageSize::Size128TiB => 256,

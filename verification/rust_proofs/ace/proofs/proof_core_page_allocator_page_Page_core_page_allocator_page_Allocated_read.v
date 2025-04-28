@@ -18,14 +18,15 @@ Proof.
 
   rep <-! liRStep; liShow.
   { (* accessing the element of the array for the read requires manual reasoning *)
-    destruct H_off as (off' & ->).
+    rename select (offset_in_bytes `rem` 8 = 0) into Hoffset.
+    apply Z.rem_divide in Hoffset; last done.
+    destruct Hoffset as (off' & ->).
 
-    apply_update (updateable_typed_array_access p.(page_loc) off' (IntSynType usize_t)).
-    rep liRStep; liShow.
-    liInst Hevar1 (Allocated_ty).
-    rep liRStep; liShow.
+    apply_update (updateable_typed_array_access self.(page_loc) off' (IntSynType usize_t)).
+
+    rep <-! liRStep; liShow.
   }
-  { rep liRStep; liShow. }
+  all: repeat liRStep; liShow.
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.

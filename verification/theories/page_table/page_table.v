@@ -19,6 +19,8 @@ Definition bit_to_bv (b : bool) : bv 1 :=
 Inductive paging_system :=
   | Sv57.
 
+Global Instance paging_system_inhabited : Inhabited paging_system.
+Proof. exact (populate Sv57). Qed.
 Global Instance paging_system_eqdec : EqDecision paging_system.
 Proof. unfold EqDecision, Decision. intros. destruct x, y; decide equality. Qed.
 
@@ -343,7 +345,7 @@ Lemma make_empty_page_tree_wf system level loc :
   page_table_wf (make_empty_page_tree system level loc).
 Proof.
   split_and!; simpl.
-  - rewrite replicate_length//.
+  - rewrite length_replicate//.
   - split; first done. apply Forall_Forall_cb.
     apply Forall_replicate. done.
   - split; first done. apply Forall_Forall_cb.
@@ -413,7 +415,7 @@ Proof.
   intros (Hlen & Hlv & Hsys).
   split_and!.
   - rewrite pt_set_entry_system pt_set_entry_level.
-    rewrite pt_set_entry_entries insert_length//.
+    rewrite pt_set_entry_entries length_insert//.
   - rewrite pt_set_entry_level.
     destruct pt; simpl in *. split; first done.
     apply Forall_Forall_cb. apply Forall_insert.

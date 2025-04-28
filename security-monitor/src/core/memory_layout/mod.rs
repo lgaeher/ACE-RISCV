@@ -88,14 +88,14 @@ impl MemoryLayout {
         "if_Ok res (λ ok, ∃ conf_start' conf_end', conf_start' `aligned_to` (page_size_in_bytes_nat Size4KiB) ∧
         conf_end' `aligned_to` (page_size_in_bytes_nat Size4KiB) ∧
         conf_start.2 ≤ conf_start'.2 ∧ conf_end'.2 ≤ conf_end.2 ∧ conf_start'.2 ≤ conf_end'.2 ∧
-        ok = -[ #conf_start'; #conf_end'])%Z"
+        ok = *[ conf_start'; conf_end'])%Z"
     )]
     /// Postcondition: if we return Ok, the MEMORY_LAYOUT has been initialized.
     #[rr::ensures(#iris "once_initialized π \"MEMORY_LAYOUT\" (match res with
-        | Ok *[ #conf_start; #conf_end] => Some (mk_memory_layout non_conf_start non_conf_end conf_start conf_end)
+        | Ok *[ conf_start; conf_end] => Some (mk_memory_layout non_conf_start non_conf_end conf_start conf_end)
         | _ => None
         end)")]
-    #[rr::returns("<#>@{result} res")]
+    #[rr::returns("res")]
     pub unsafe fn init(
         non_confidential_memory_start: *mut usize, non_confidential_memory_end: *const usize, confidential_memory_start: *mut usize,
         mut confidential_memory_end: *const usize,
@@ -133,12 +133,11 @@ impl MemoryLayout {
     /// Offsets an address in the confidential memory by a given number of bytes. Returns an error if the resulting
     /// address is not in the confidential memory region.
     #[rr::only_spec]
-    #[rr::params("bounds", "l", "off")]
-    #[rr::args("#bounds", "#l", "off")]
+    #[rr::ok]
     /// Precondition: The offset address is in confidential memory.
-    #[rr::requires("l.2 + off < bounds.(conf_end).2")]
+    #[rr::requires("address.2 + offset_in_bytes < self.(conf_end).2")]
     /// Postcondition: The offset pointer is in confidential memory.
-    #[rr::returns("Ok (#(l +ₗ off))")]
+    #[rr::ensures("ret = address +ₗ offset_in_bytes")]
     pub fn confidential_address_at_offset(
         &self, address: &ConfidentialMemoryAddress, offset_in_bytes: usize,
     ) -> Result<ConfidentialMemoryAddress, Error> {
@@ -147,16 +146,15 @@ impl MemoryLayout {
 
     /// Offsets an address in the confidential memory by a given number of bytes. Returns an error if the resulting
     /// address is outside the confidential memory region or exceeds the given upper bound.
-    #[rr::only_spec]
-    #[rr::params("bounds", "l", "off", "bound")]
-    #[rr::args("#bounds", "#l", "off", "bound")]
+    #[rr::trust_me]
+    #[rr::ok]
     /// Precondition: The offset address is in confidential memory.
-    #[rr::requires("l.2 + off < bounds.(conf_end).2")]
+    #[rr::requires("address.2 + offset_in_bytes < self.(conf_end).2")]
     /// Precondition: The bounds we are checking are within confidential memory.
-    #[rr::requires("bound.2 ≤ bounds.(conf_end).2")]
+    #[rr::requires("upper_bound.2 ≤ self.(conf_end).2")]
     /// Postcondition: Then we can correctly offset the address and ensure it is in confidential
     /// memory.
-    #[rr::returns("Ok (#(l +ₗ off))")]
+    #[rr::ensures("ret = address +ₗ offset_in_bytes")]
     pub fn confidential_address_at_offset_bounded(
         &self, address: &ConfidentialMemoryAddress, offset_in_bytes: usize, upper_bound: *const usize,
     ) -> Result<ConfidentialMemoryAddress, Error> {
@@ -167,13 +165,12 @@ impl MemoryLayout {
     /// Offsets an address in the non-confidential memory by given number of bytes. Returns an error if the resulting
     /// address is outside the non-confidential memory region.
     #[rr::only_spec]
-    #[rr::params("bounds", "l", "off")]
-    #[rr::args("#bounds", "#l", "off")]
+    #[rr::ok]
     /// Precondition: The offset address is in non-confidential memory.
-    #[rr::requires("l.2 + off < bounds.(non_conf_end).2")]
+    #[rr::requires("address.2 + offset_in_bytes < self.(non_conf_end).2")]
     /// Postcondition: Then we can correctly offset the address and ensure it is in
     /// non-confidential memory.
-    #[rr::returns("Ok (#(l +ₗ off))")]
+    #[rr::ensures("ret = address +ₗ offset_in_bytes")]
     pub fn non_confidential_address_at_offset(
         &self, address: &NonConfidentialMemoryAddress, offset_in_bytes: usize,
     ) -> Result<NonConfidentialMemoryAddress, Error> {
@@ -183,9 +180,7 @@ impl MemoryLayout {
 
     /// Returns true if the raw pointer is inside the non-confidential memory.
     #[rr::only_spec]
-    #[rr::params("bounds", "l")]
-    #[rr::args("#bounds", "l")]
-    #[rr::returns("bool_decide (bounds.(non_conf_start).2 ≤ l.2 ∧ l.2 < bounds.(non_conf_end).2)")]
+    #[rr::returns("bool_decide (self.(non_conf_start).2 ≤ address.2 ∧ address.2 < self.(non_conf_end).2)")]
     pub fn is_in_non_confidential_range(&self, address: *const usize) -> bool {
         self.non_confidential_memory_start as *const usize <= address && address < self.non_confidential_memory_end
     }
@@ -214,16 +209,14 @@ impl MemoryLayout {
     #[rr::params("x")]
     /// Precondition: The memory layout has been initialized.
     #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some x)")]
-    #[rr::returns("#x")]
+    #[rr::returns("x")]
     pub fn read() -> &'static MemoryLayout {
         MEMORY_LAYOUT.get().expect(Self::NOT_INITIALIZED_MEMORY_LAYOUT)
     }
 
     /// Get the boundaries of confidential memory as a (start, end) tuple.
     #[rr::only_spec]
-    #[rr::params("bounds")]
-    #[rr::args("#bounds")]
-    #[rr::returns("-[#bounds.(conf_start).2; #bounds.(conf_end).2]")]
+    #[rr::returns(" *[self.(conf_start).2; self.(conf_end).2]")]
     pub fn confidential_memory_boundary(&self) -> (usize, usize) {
         (self.confidential_memory_start as usize, self.confidential_memory_end as usize)
     }

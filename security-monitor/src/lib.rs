@@ -22,11 +22,7 @@
 // RefinedRust configuration
 #![register_tool(rr)]
 #![rr::coq_prefix("sm")]
-#![rr::include("spin")]
-#![rr::include("alloc")]
-#![rr::include("vec")]
-#![rr::include("option")]
-#![rr::include("result")]
+#![rr::include("stdlib")]
 
 extern crate alloc;
 
