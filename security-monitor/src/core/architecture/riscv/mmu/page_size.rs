@@ -29,6 +29,7 @@ impl PageSize {
     // and 4KiB).
     pub const TYPICAL_NUMBER_OF_PAGES_INSIDE_LARGER_PAGE: usize = 512;
 
+    // TODO: need performance optimizations for verifying this
     #[rr::trust_me]
     #[rr::returns("page_size_in_bytes_Z self")]
     pub fn in_bytes(&self) -> usize {
@@ -66,7 +67,7 @@ impl PageSize {
         }
     }
 
-    #[rr::returns("page_size_multiplier self")]
+    #[rr::returns("number_of_smaller_pages self")]
     pub fn number_of_smaller_pages(&self) -> usize {
         match self {
             PageSize::Size128TiB => 256,

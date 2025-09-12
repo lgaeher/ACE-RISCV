@@ -16,8 +16,9 @@ Definition bit_to_bv (b : bool) : bv 1 :=
 
 (** ** Paging system *)
 (* Currently we only include the supported paging systems *)
-Inductive paging_system :=
+Inductive paging_system : Type :=
   | Sv57.
+Canonical Structure paging_systemRT := directRT paging_system.
 
 Global Instance paging_system_inhabited : Inhabited paging_system.
 Proof. exact (populate Sv57). Qed.
@@ -209,12 +210,13 @@ Record shared_page : Type := {
 }.
 
 (** Level of page tables *)
-Inductive page_table_level :=
+Inductive page_table_level : Type :=
   | PTLevel5
   | PTLevel4
   | PTLevel3
   | PTLevel2
   | PTLevel1.
+Canonical Structure page_table_levelRT := directRT page_table_level.
 
 Global Instance page_table_level_eqdec : EqDecision page_table_level.
 Proof. solve_decision. Defined.

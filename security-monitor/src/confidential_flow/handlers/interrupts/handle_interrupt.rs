@@ -19,6 +19,13 @@ impl HandleInterrupt {
     }
 
     pub fn handle(self, confidential_flow: ConfidentialFlow) -> ! {
+        // NOTE(LG): confidential branch: if it's a supervisor interrupt, we forward to hypervisor
+        //
+        // TODO: potentially problematic, because we cannot reason semantically about what is
+        // declassified.
+        // (I cannot do fine-grained reasoning a la "evenness is declassified")
+        // I guess I can do syntactic reasoning at byte/bit level if really necessary.
+        //
         if self.pending_interrupts & MIE_SSIP_MASK > 0 {
             // One of the reasons why the confidential hart was interrupted with SSIP is that it got an `ConfidentialHartRemoteCommand` from
             // another confidential hart. If this is the case, we must process all queued requests before resuming confidential
@@ -33,6 +40,7 @@ impl HandleInterrupt {
     }
 
     pub fn declassify_to_hypervisor_hart(&self, hypervisor_hart: &mut HypervisorHart) {
+        // NOTE(LG): do we only selectively want to declassify some bits?
         hypervisor_hart.csrs_mut().scause.write(self.pending_interrupts | SCAUSE_INTERRUPT_MASK);
         SbiResponse::success().declassify_to_hypervisor_hart(hypervisor_hart);
     }

@@ -4,16 +4,7 @@
 #![no_std]
 #![no_main]
 #![feature(
-    // used for meaningful panic code
-    panic_info_message,
-    // used for calculating offsets for assembly
-    asm_const,
-    // const_mut_ref for LinkedList implementation used in the heap allocator
-    const_mut_refs,
-    pointer_is_aligned,
-    // pointer_is_aligned_to,
-    result_option_inspect,
-    pointer_byte_offsets,
+    pointer_is_aligned_to,
     // used for formal verification framework (RefinedRust annotations)
     register_tool,
     custom_inner_attributes,
@@ -33,3 +24,5 @@ mod confidential_flow;
 mod core;
 mod error;
 mod non_confidential_flow;
+
+mod rrshims;

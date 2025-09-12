@@ -37,22 +37,18 @@ impl ConfidentialMemoryAddress {
     // would be good to get rid of this because it requires extra safety guarantees for
     // parallel execution of the security monitor
     #[rr::returns("self")]
-    pub unsafe fn into_mut_ptr(self) -> *mut usize {
+    pub fn into_mut_ptr(self) -> *mut usize {
         self.0
     }
 
     #[rr::returns("self")]
-    pub unsafe fn to_ptr(&self) -> *const u8 {
-        self.0 as *const u8
+    pub fn to_ptr(&self) -> *const usize {
+        self.0 as *const usize
     }
 
-    #[rr::only_spec]
     #[rr::returns("self.2")]
     pub fn as_usize(&self) -> usize {
-        // TODO: check if we need to expose the pointer.
-        // If not, use addr() instead.
-        // self.0.addr()
-        self.0 as usize
+        self.0.addr()
     }
 
     #[rr::only_spec]
@@ -62,26 +58,20 @@ impl ConfidentialMemoryAddress {
         self.0.is_aligned_to(align)
     }
 
-    #[rr::only_spec]
     /// Postcondition: Compute the offset.
-    #[rr::returns("pointer.2 - self.2")]
+    #[rr::returns("wrap_to_it (pointer.2 - self.2) isize")]
     pub fn offset_from(&self, pointer: *const usize) -> isize {
         ptr_byte_offset(pointer, self.0)
     }
 
     /// Creates a new confidential memory address at given offset. Error is returned if the resulting address exceeds
     /// the upper boundary.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the address at given offset is still within the confidential memory region.
     // TODO: can we require the offset to be a multiple of usize?
     #[rr::only_spec]
     #[rr::params("MEMORY_CONFIG")]
 
     /// Precondition: The global memory layout is initialized.
     #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
-
     #[rr::ok]
     /// Precondition: The offset address is in the given range.
     #[rr::requires("self.2 + offset_in_bytes < upper_bound.2")]
@@ -89,8 +79,7 @@ impl ConfidentialMemoryAddress {
     #[rr::requires("upper_bound.2 < MEMORY_CONFIG.(conf_end).2")]
     /// Postcondition: The offset pointer is in the confidential memory range.
     #[rr::ensures("ret = self +ₗ offset_in_bytes")]
-
-    pub unsafe fn add(&self, offset_in_bytes: usize, upper_bound: *const usize) -> Result<ConfidentialMemoryAddress, Error> {
+    pub fn add(&self, offset_in_bytes: usize, upper_bound: *const usize) -> Result<ConfidentialMemoryAddress, Error> {
         let pointer = ptr_byte_add_mut(self.0, offset_in_bytes, upper_bound).map_err(|_| Error::AddressNotInConfidentialMemory())?;
         Ok(ConfidentialMemoryAddress(pointer))
     }
@@ -100,11 +89,9 @@ impl ConfidentialMemoryAddress {
     ///
     /// Caller must ensure that the pointer is not used by two threads simultaneously and that it is correctly aligned for usize.
     /// See `ptr::read_volatile` for safety concerns
-    // TODO: currently only_spec because shim registration for read_volatile doesn't work
-    // TODO require that lifetime [lft_el] is actually alive
-    #[rr::only_spec]
     #[rr::params("z", "lft_el")]
-    #[rr::requires(#iris "self ◁ₗ[π, Shared lft_el] #z @ ◁ int usize_t")]
+    #[rr::unsafe_elctx("[ϝ ⊑ₑ lft_el]")]
+    #[rr::requires(#iris "self ◁ₗ[π, Shared lft_el] #z @ ◁ int usize")]
     #[rr::returns("z")]
     pub unsafe fn read_volatile<'a>(&'a self) -> usize {
         self.0.read_volatile()
@@ -115,11 +102,9 @@ impl ConfidentialMemoryAddress {
     ///
     /// Caller must ensure that the pointer is not used by two threads simultaneously and that it is correctly aligned for usize.
     /// See `ptr::write_volatile` for safety concerns
-    // TODO: currently only_spec because shim registration for write_volatile doesn't work
-    #[rr::only_spec]
     #[rr::params("z")]
-    #[rr::requires(#type "self" : "z" @ "int usize_t")]
-    #[rr::ensures(#type "self" : "value" @ "int usize_t")]
+    #[rr::requires(#type "self" : "z" @ "int usize")]
+    #[rr::ensures(#type "self" : "value" @ "int usize")]
     pub unsafe fn write_volatile(&self, value: usize) {
         self.0.write_volatile(value);
     }

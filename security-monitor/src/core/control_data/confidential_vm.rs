@@ -198,16 +198,34 @@ impl ConfidentialVm {
     /// IPI failed.
     pub fn broadcast_remote_command(&mut self, remote_command: ConfidentialHartRemoteCommand) -> Result<(), Error> {
         (0..self.confidential_harts.len())
+            // filter the indices
             .filter(|confidential_hart_id| remote_command.is_hart_selected(*confidential_hart_id))
+            // for every entry, try to send the command
+            // Abstractly, we want to ensure that afterwards, all potentially affected harts will
+            // be signalled eventually (when they handle their interrupt), or we return an error
             .try_for_each(|confidential_hart_id| {
                 match self.confidential_harts[confidential_hart_id].hardware_hart_id() {
+                    // check if we are running on a hardware hart
+                    // TODO: is this safe? is it impossible that it starts executing while we are
+                    // executing this procedure?
+                    // => safe because we locked the entire ConfidentialVm.
                     Some(id_of_hardware_hart_running_confidential_hart) => {
                         // The confidential hart that should receive an ConfidentialHartRemoteCommand is currently running on a hardware
                         // hart. We add the ConfidentialHartRemoteCommand to a per confidential hart queue and then interrupt that
                         // hardware hart with IPI. Consequently, the hardware hart running the target confidential hart will
                         // trap into the security monitor, which will execute ConfidentialHartRemoteCommands on the targetted
                         // confidential hart.
+
+                        // Note: we acquire a lock here.
+                        // This blocks until the lock can be acquired.
+                        // I suppose this should never fail if we have a strong enough invariant
+                        // that the map is complete.
+                        //
+                        // Question: What if this fails because we exceed the limit?
+                        // This is something non-deterministic and we will not be able to rule it out.
+                        // => Just like for memory allocation, we might stop execution at any point.
                         self.try_confidential_hart_remote_commands(confidential_hart_id, |ref mut remote_commands| {
+                            // But this can always fail.
                             ensure!(remote_commands.len() < Self::MAX_NUMBER_OF_COMMANDS, Error::ReachedMaxNumberOfRemoteCommands())?;
                             Ok(remote_commands.push(remote_command.clone()))
                         })?;
@@ -225,6 +243,7 @@ impl ConfidentialVm {
 
     pub fn try_confidential_hart_remote_commands<F, O>(&mut self, confidential_hart_id: usize, op: O) -> Result<F, Error>
     where O: FnOnce(MutexGuard<'_, Vec<ConfidentialHartRemoteCommand>>) -> Result<F, Error> {
+        // TODO: is this total?
         op(self.remote_commands.get(&confidential_hart_id).ok_or(Error::InvalidHartId())?.lock())
     }
 }

@@ -104,7 +104,7 @@ impl PromoteToConfidentialVm {
         ensure!(address_in_confidential_memory.is_aligned_to(Self::FDT_ALIGNMENT_IN_BYTES), Error::AuthBlobNotAlignedTo64Bits())?;
         // Below use of unsafe is ok because (1) the security monitor owns the memory region containing the data of the not-yet-created
         // confidential VM's and (2) there is only one physical hart executing this code.
-        let fdt_total_size = unsafe { FlattenedDeviceTree::total_size(address_in_confidential_memory.to_ptr())? };
+        let fdt_total_size = unsafe { FlattenedDeviceTree::total_size(address_in_confidential_memory.to_ptr() as *const u8)? };
         ensure!(fdt_total_size >= FlattenedDeviceTree::FDT_HEADER_SIZE, Error::FdtInvalidSize())?;
 
         // To work with FDT, we must have it as a continous chunk of memory. We accept only FDTs that fit within 2MiB
@@ -114,10 +114,11 @@ impl PromoteToConfidentialVm {
         // Security note: We parse untrusted FDT using an external library. A vulnerability in this library might blow up our security
         // guarantees! Below unsafe is ok because FDT address is at least size of the FDT header and all FDT is in a continuous chunk of
         // memory. See the safety requirements of `FlattenedDeviceTree::from_raw_pointer`.
-        let number_of_confidential_harts = match unsafe { FlattenedDeviceTree::from_raw_pointer(large_page.address().to_ptr()) } {
-            Ok(device_tree) => device_tree.harts().count(),
-            Err(_) => 0,
-        };
+        let number_of_confidential_harts =
+            match unsafe { FlattenedDeviceTree::from_raw_pointer(large_page.address().to_ptr() as *const u8) } {
+                Ok(device_tree) => device_tree.harts().count(),
+                Err(_) => 0,
+            };
 
         // Clean up, deallocate pages
         PageAllocator::release_pages(alloc::vec![large_page.deallocate()]);

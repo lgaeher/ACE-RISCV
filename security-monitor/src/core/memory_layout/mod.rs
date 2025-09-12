@@ -67,35 +67,36 @@ impl MemoryLayout {
     ///
     /// This function must be called only once by the initialization procedure during the boot of the system.
     #[rr::only_spec]
-    #[rr::params("non_conf_start", "non_conf_end", "conf_start", "conf_end")]
-    #[rr::args("non_conf_start", "non_conf_end", "conf_start", "conf_end")]
     /// Precondition: The non-confidential memory should have positive size.
-    #[rr::requires("non_conf_start.2 < non_conf_end.2")]
+    #[rr::requires("non_confidential_memory_start.2 < non_confidential_memory_end.2")]
     /// Precondition: The non-condidential memory should preceed and not overlap with confidential memory.
-    #[rr::requires("non_conf_end.2 ≤ conf_start.2")]
+    #[rr::requires("non_confidential_memory_end.2 ≤ confidential_memory_start.2")]
     /// Precondition: The confidential memory should have positive size.
-    #[rr::requires("conf_start.2 < conf_end.2")]
+    #[rr::requires("confidential_memory_start.2 < confidential_memory_end.2")]
     /// Precondition: The global MEMORY_LAYOUT has not been initialized yet.
     #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" None")]
     /// Postcondition: There exists a result -- failure is always an option
-    #[rr::exists("res")]
+    #[rr::exists("res", "maybe_mem_layout")]
     /// Postcondition: failure due to low memory can occur if there is no sufficiently aligned
     /// confidential address
-    #[rr::ensures("if_Err res (λ err, (conf_start.2 - conf_end.2 ≤ page_size_in_bytes_Z Size4KiB)%Z ∧ err = error_Error_NotEnoughMemory)")]
+    #[rr::ensures("if_Err res (λ err, (confidential_memory_start.2 - confidential_memory_end.2 ≤ page_size_in_bytes_Z Size4KiB)%Z ∧ err = error_Error_NotEnoughMemory)")]
     /// Postcondition: if we return Ok, we get a new confidential memory range that is correctly
     /// aligned for the smallest page size and is a subrange of [conf_start, conf_end)
     #[rr::ensures(
-        "if_Ok res (λ ok, ∃ conf_start' conf_end', conf_start' `aligned_to` (page_size_in_bytes_nat Size4KiB) ∧
-        conf_end' `aligned_to` (page_size_in_bytes_nat Size4KiB) ∧
-        conf_start.2 ≤ conf_start'.2 ∧ conf_end'.2 ≤ conf_end.2 ∧ conf_start'.2 ≤ conf_end'.2 ∧
-        ok = *[ conf_start'; conf_end'])%Z"
+        "if_Ok res (λ ok, 
+            ∃ mem_layout,
+            maybe_mem_layout = Some mem_layout ∧
+            mem_layout.(conf_start) `aligned_to` (page_size_in_bytes_nat Size4KiB) ∧
+            mem_layout.(conf_end) `aligned_to` (page_size_in_bytes_nat Size4KiB) ∧
+            confidential_memory_start.2 ≤ mem_layout.(conf_start).2 ∧
+            mem_layout.(conf_end).2 ≤ confidential_memory_end.2 ∧
+            mem_layout.(conf_start).2 ≤ mem_layout.(conf_end).2 ∧
+            ok = *[ mem_layout.(conf_start); mem_layout.(conf_end)])%Z"
     )]
     /// Postcondition: if we return Ok, the MEMORY_LAYOUT has been initialized.
-    #[rr::ensures(#iris "once_initialized π \"MEMORY_LAYOUT\" (match res with
-        | Ok *[ conf_start; conf_end] => Some (mk_memory_layout non_conf_start non_conf_end conf_start conf_end)
-        | _ => None
-        end)")]
+    #[rr::ensures(#iris "once_initialized π \"MEMORY_LAYOUT\" maybe_mem_layout")]
     #[rr::returns("res")]
+    // TODO: make sure that confidential and non-confidential mem are not bigger than isize?
     pub unsafe fn init(
         non_confidential_memory_start: *mut usize, non_confidential_memory_end: *const usize, confidential_memory_start: *mut usize,
         mut confidential_memory_end: *const usize,
