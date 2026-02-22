@@ -7,6 +7,7 @@
 // for the `PageSize`.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+// !start spec(page_size.page_size)
 #[rr::refined_by("page_size")]
 // PEq
 #[rr::derive_instantiate("PEq" := "λ a b, bool_decide (a = b)")]
@@ -14,6 +15,7 @@
 #[rr::derive_instantiate("PEq_refl" := #proof "intros ??; solve_goal")]
 #[rr::derive_instantiate("PEq_sym" := #proof "intros ???; solve_goal")]
 #[rr::derive_instantiate("PEq_trans" := #proof "intros ????; solve_goal")]
+#[rr::derive_instantiate("PEq_leibniz" := #proof "intros ? [] []; simpl; done")]
 // POrd
 #[rr::derive_instantiate("POrd" := "λ a b, Some (page_size_cmp a b)")]
 #[rr::derive_instantiate("POrd_eq_cons" := #proof "intros ? [] []; simpl; done")]
@@ -23,8 +25,8 @@
 #[rr::derive_instantiate("Ord_lt_trans" := #proof "intros ????; solve_goal")]
 #[rr::derive_instantiate("Ord_eq_trans" := #proof "intros ????; solve_goal")]
 #[rr::derive_instantiate("Ord_gt_trans" := #proof "intros ????; solve_goal")]
-#[rr::derive_instantiate("Ord_leibniz" := #proof "intros ? [] []; simpl; done")]
 #[rr::derive_instantiate("Ord_antisym" := #proof "intros ???; solve_goal")]
+// !end spec
 pub enum PageSize {
     #[rr::pattern("Size4KiB")]
     Size4KiB,
@@ -47,8 +49,11 @@ impl PageSize {
     pub const TYPICAL_NUMBER_OF_PAGES_INSIDE_LARGER_PAGE: usize = 512;
 
     // TODO: need performance optimizations for verifying this
+    // !start spec(page_size.in_bytes)
     #[rr::trust_me]
     #[rr::returns("page_size_in_bytes_Z self")]
+    // !end spec
+    // !start code(page_size.in_bytes)
     pub fn in_bytes(&self) -> usize {
         match self {
             PageSize::Size128TiB => 8 * 512 * 512 * 512 * 512 * 256,
@@ -59,8 +64,12 @@ impl PageSize {
             PageSize::Size4KiB => 8 * 512,
         }
     }
+    // !end code
 
+    // !start spec(page_size.smaller)
     #[rr::returns("page_size_smaller self")]
+    // !end spec
+    // !start code(page_size.smaller)
     pub fn smaller(&self) -> Option<PageSize> {
         match self {
             PageSize::Size128TiB => Some(PageSize::Size512GiB),
@@ -71,8 +80,12 @@ impl PageSize {
             PageSize::Size4KiB => None,
         }
     }
+    // !end code
 
+    // !start spec(page_size.larger)
     #[rr::returns("page_size_larger self")]
+    // !end spec
+    // !start code(page_size.larger)
     pub fn larger(&self) -> Option<PageSize> {
         match self {
             PageSize::Size128TiB => None,
@@ -83,8 +96,12 @@ impl PageSize {
             PageSize::Size4KiB => Some(PageSize::Size16KiB),
         }
     }
+    // !end code
 
+    // !start spec(page_size.number_of_smaller_pages)
     #[rr::returns("number_of_smaller_pages self")]
+    // !end spec
+    // !start code(page_size.number_of_smaller_pages)
     pub fn number_of_smaller_pages(&self) -> usize {
         match self {
             PageSize::Size128TiB => 256,
@@ -95,16 +112,25 @@ impl PageSize {
             PageSize::Size4KiB => 0,
         }
     }
+    // !end code
 
+    // !start spec(page_size.largest)
     #[rr::returns("Size128TiB")]
+    // !end spec
+    // !start code(page_size.largest)
     pub fn largest() -> PageSize {
         PageSize::Size128TiB
     }
+    // !end code
 
+    // !start spec(page_size.smallest)
     #[rr::returns("Size4KiB")]
+    // !end spec
+    // !start code(page_size.smallest)
     pub fn smallest() -> PageSize {
         PageSize::Size4KiB
     }
+    // !end code
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@
 use crate::core::architecture::riscv::sbi::*;
 use thiserror_no_std::Error;
 
+#[rr::verify]
 #[derive(Error, Debug)]
 pub enum Error {
     /* Initialization-related errors */

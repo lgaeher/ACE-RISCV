@@ -8,6 +8,7 @@ use pointers_utility::ptr_byte_add_mut;
 /// The wrapper over a raw pointer that is guaranteed to be an address located in the non-confidential memory region.
 #[repr(transparent)]
 #[derive(Debug)]
+// !start spec(non_confidential_memory_address.non_confidential_memory_address)
 /// Model: The memory address is represented by the location in memory.
 #[rr::refined_by("l" : "loc")]
 /// We require the ghost state for the global memory layout to be available.
@@ -16,11 +17,13 @@ use pointers_utility::ptr_byte_add_mut;
 #[rr::exists("MEMORY_CONFIG")]
 #[rr::invariant(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
 /// Invariant: The address is in non-confidential memory.
-#[rr::invariant("(MEMORY_CONFIG.(non_conf_start).2 ≤ l.2 < MEMORY_CONFIG.(non_conf_end).2)%Z")]
+#[rr::invariant("(MEMORY_CONFIG.(non_conf_start).(loc_a) ≤ l.(loc_a) < MEMORY_CONFIG.(non_conf_end).(loc_a))%Z")]
+// !end spec
 pub struct NonConfidentialMemoryAddress(#[rr::field("l")] *mut usize);
 
 #[rr::context("onceG Σ memory_layout")]
 impl NonConfidentialMemoryAddress {
+    // !start spec(non_confidential_memory_address.new)
     /// Constructs an address in a non-confidential memory. Returns error if the address is outside non-confidential
     /// memory.
     #[rr::trust_me]
@@ -29,16 +32,20 @@ impl NonConfidentialMemoryAddress {
     #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some bounds)")]
     #[rr::ok]
     /// Precondition: The location is in non-confidential memory.
-    #[rr::requires("bounds.(non_conf_start).2 ≤ address.2 < bounds.(non_conf_end).2")]
+    #[rr::requires("bounds.(non_conf_start).(loc_a) ≤ address.(loc_a) < bounds.(non_conf_end).(loc_a)")]
     /// Postcondition: The non-confidential memory address is correctly initialized.
     #[rr::ensures("ret = address")]
+    // !end spec
+    // !start code(non_confidential_memory_address.new)
     pub fn new(address: *mut usize) -> Result<Self, Error> {
         match MemoryLayout::read().is_in_non_confidential_range(address) {
             false => Err(Error::AddressNotInNonConfidentialMemory()),
             true => Ok(Self(address)),
         }
     }
+    // !end code
 
+    // !start spec(non_confidential_memory_address.add)
     /// Creates a new non-confidential memory address at given offset. Returns error if the resulting address exceeds
     /// the upper boundary.
     ///
@@ -50,45 +57,67 @@ impl NonConfidentialMemoryAddress {
     #[rr::only_spec]
     #[rr::params("MEMORY_CONFIG")]
     /// Precondition: The offset address is in the given range.
-    #[rr::requires("self.2 + offset_in_bytes < upper_bound.2")]
+    #[rr::requires("self.(loc_a) + offset_in_bytes < upper_bound.(loc_a)")]
     /// Precondition: The global memory layout is initialized.
     #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     /// Precondition: The maximum (and thus the offset address) is in the non-confidential memory range.
-    #[rr::requires("upper_bound.2 < MEMORY_CONFIG.(non_conf_end).2")]
+    #[rr::requires("upper_bound.(loc_a) < MEMORY_CONFIG.(non_conf_end).(loc_a)")]
     /// Postcondition: The offset pointer is in the non-confidential memory range.
     #[rr::returns("Ok(self +ₗ offset_in_bytes)")]
+    // !end spec
+    // !start code(non_confidential_memory_address.add)
     pub unsafe fn add(&self, offset_in_bytes: usize, upper_bound: *const usize) -> Result<NonConfidentialMemoryAddress, Error> {
         let pointer = ptr_byte_add_mut(self.0, offset_in_bytes, upper_bound).map_err(|_| Error::AddressNotInNonConfidentialMemory())?;
         Ok(NonConfidentialMemoryAddress(pointer))
     }
+    // !end code
 
+    // !start spec(non_confidential_memory_address.read)
     /// Reads usize-sized sequence of bytes from the non-confidential memory region.
     ///
     /// # Safety
     ///
     /// We need to ensure the pointer is not used by two threads simultaneously. See `ptr::read_volatile` for safety
     /// concerns.
+    #[rr::params("z", "lft_el")]
+    #[rr::unsafe_elctx("[ϝ ⊑ₑ lft_el]")]
+    #[rr::requires(#iris "self ◁ₗ[π, Shared lft_el] #z @ ◁ int usize")]
+    #[rr::returns("z")]
+    // !end spec
+    // !start code(non_confidential_memory_address.read)
     pub unsafe fn read(&self) -> usize {
         unsafe { self.0.read_volatile() }
     }
+    // !end code
 
+    // !start spec(non_confidential_memory_address.write)
     /// Writes usize-sized sequence of bytes to the non-confidential memory region.
     ///
     /// # Safety
     ///
     /// We need to ensure the pointer is not used by two threads simultaneously. See `ptr::write_volatile` for safety
     /// concerns.
+    #[rr::params("z")]
+    #[rr::requires(#type "self" : "z" @ "int usize")]
+    #[rr::ensures(#type "self" : "value" @ "int usize")]
+    // !end spec
+    // !start code(non_confidential_memory_address.write)
     pub unsafe fn write(&self, value: usize) {
         unsafe { self.0.write_volatile(value) };
     }
+    // !end code
 
+    // !start spec(non_confidential_memory_address.as_ptr)
     #[rr::returns("self")]
+    // !end spec
+    // !start code(non_confidential_memory_address.as_ptr)
     pub fn as_ptr(&self) -> *const usize {
         self.0
     }
+    // !end code
 
     #[rr::only_spec]
-    #[rr::returns("self.2")]
+    #[rr::returns("self.(loc_a)")]
     pub fn usize(&self) -> usize {
         // TODO: check if we need to expose the pointer.
         // If not, use addr() instead.

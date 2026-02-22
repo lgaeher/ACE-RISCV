@@ -7,6 +7,7 @@ use pointers_utility::{ptr_byte_add_mut, ptr_byte_offset};
 /// The wrapper over a raw pointer that is guaranteed to be an address located in the confidential memory region.
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Clone, Copy)]
+// !start spec(confidential_memory_address.confidential_memory_address)
 /// Model: The memory address is represented by the location in memory.
 #[rr::refined_by("l" : "loc")]
 /// We require the ghost state for the global memory layout to be available.
@@ -15,7 +16,8 @@ use pointers_utility::{ptr_byte_add_mut, ptr_byte_offset};
 #[rr::exists("MEMORY_CONFIG")]
 #[rr::invariant(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
 /// Invariant: The address is in the confidential part of the memory layout.
-#[rr::invariant("(MEMORY_CONFIG.(conf_start).2 ≤ l.2 < MEMORY_CONFIG.(conf_end).2)%Z")]
+#[rr::invariant("(MEMORY_CONFIG.(conf_start).(loc_a) ≤ l.(loc_a) < MEMORY_CONFIG.(conf_end).(loc_a))%Z")]
+// !end spec
 pub struct ConfidentialMemoryAddress(#[rr::field("l")] *mut usize);
 
 /// Verification: We require the ghost state for the global memory layout to be available.
@@ -25,7 +27,7 @@ impl ConfidentialMemoryAddress {
     /// Precondition: The global memory layout is initialized.
     #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     /// Precondition: The address is in the confidential region of the global memory layout.
-    #[rr::requires("(MEMORY_CONFIG.(conf_start).2 ≤ address.2 < MEMORY_CONFIG.(conf_end).2)%Z")]
+    #[rr::requires("(MEMORY_CONFIG.(conf_start).(loc_a) ≤ address.(loc_a) < MEMORY_CONFIG.(conf_end).(loc_a))%Z")]
     #[rr::returns("address")]
     // TODO this should be unsafe
     pub(super) fn new(address: *mut usize) -> Self {
@@ -37,7 +39,7 @@ impl ConfidentialMemoryAddress {
         self.0 as *const u8
     }
 
-    #[rr::returns("self.2")]
+    #[rr::returns("self.(loc_a)")]
     pub fn as_usize(&self) -> usize {
         self.0.addr()
     }
@@ -50,11 +52,12 @@ impl ConfidentialMemoryAddress {
     }
 
     /// Postcondition: Compute the offset.
-    #[rr::returns("wrap_to_it (pointer.2 - self.2) isize")]
+    #[rr::returns("wrap_to_it (pointer.(loc_a) - self.(loc_a)) isize")]
     pub fn offset_from(&self, pointer: *const usize) -> isize {
         ptr_byte_offset(pointer, self.0)
     }
 
+    // !start spec(confidential_memory_address.add)
     /// Creates a new confidential memory address at given offset. Error is returned if the resulting address exceeds
     /// the upper boundary.
     ///
@@ -68,16 +71,20 @@ impl ConfidentialMemoryAddress {
     #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     #[rr::ok]
     /// Precondition: The offset address is in the given range.
-    #[rr::requires("self.2 + offset_in_bytes < upper_bound.2")]
+    #[rr::requires("self.(loc_a) + offset_in_bytes < upper_bound.(loc_a)")]
     /// Precondition: The maximum (and thus the offset address) is in the confidential memory range.
-    #[rr::requires("upper_bound.2 ≤ MEMORY_CONFIG.(conf_end).2")]
+    #[rr::requires("upper_bound.(loc_a) ≤ MEMORY_CONFIG.(conf_end).(loc_a)")]
     /// Postcondition: The offset pointer is in the confidential memory range.
     #[rr::ensures("ret = self +ₗ offset_in_bytes")]
+    // !end spec
+    // !start code(confidential_memory_address.add)
     pub fn add(&self, offset_in_bytes: usize, upper_bound: *const usize) -> Result<ConfidentialMemoryAddress, Error> {
         let pointer = ptr_byte_add_mut(self.0, offset_in_bytes, upper_bound).map_err(#[rr::verify] |_| Error::AddressNotInConfidentialMemory())?;
         Ok(Self::new(pointer))
     }
+    // !end code
 
+    // !start spec(confidential_memory_address.read_volatile)
     /// Reads usize-sized sequence of bytes from the confidential memory region.
     /// # Safety
     ///
@@ -87,10 +94,14 @@ impl ConfidentialMemoryAddress {
     #[rr::unsafe_elctx("[ϝ ⊑ₑ lft_el]")]
     #[rr::requires(#iris "self ◁ₗ[π, Shared lft_el] #z @ ◁ int usize")]
     #[rr::returns("z")]
+    // !end spec
+    // !start code(confidential_memory_address.read_volatile)
     pub unsafe fn read_volatile<'a>(&'a self) -> usize {
         unsafe { self.0.read_volatile() }
     }
+    // !end code
 
+    // !start spec(confidential_memory_address.write_volatile)
     /// Writes usize-sized sequence of bytes to the confidential memory region.
     /// # Safety
     ///
@@ -99,7 +110,10 @@ impl ConfidentialMemoryAddress {
     #[rr::params("z")]
     #[rr::requires(#type "self" : "z" @ "int usize")]
     #[rr::ensures(#type "self" : "value" @ "int usize")]
+    // !end spec
+    // !start code(confidential_memory_address.write_volatile)
     pub unsafe fn write_volatile(&self, value: usize) {
         unsafe { self.0.write_volatile(value) };
     }
+    // !end code
 }

@@ -33,6 +33,7 @@ Proof.
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   Unshelve. all: sidecond_hammer.
+  (* !start proof(page.divide) *)
   - (* add *)
     eapply aligned_to_offset.
     { apply Haligned. }
@@ -45,6 +46,7 @@ Proof.
     move: Hinrange.
     specialize (page_size_in_bytes_nat_ge capture_smaller_page_size_).
     nia.
+  (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
 Qed.

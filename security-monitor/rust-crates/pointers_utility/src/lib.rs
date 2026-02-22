@@ -16,13 +16,17 @@ mod error;
 use core::mem::size_of;
 pub use crate::error::PointerError;
 
+// !start spec(pointers_utility.ptr_byte_offset)
 /// Calculates the offset in bytes between two pointers. 
 #[rr::only_spec]
-#[rr::returns("wrap_to_it (pointer1.2 - pointer2.2) isize")]
+#[rr::returns("wrap_to_it (pointer1.(loc_a) - pointer2.(loc_a)) isize")]
+// !end spec
+// !start code(pointers_utility.ptr_byte_offset)
 pub fn ptr_byte_offset(pointer1: *const usize, pointer2: *const usize) -> isize {
     // TODO: we should use wrapping arithmetic here, as it might overflow
     (pointer1.addr() as isize) - (pointer2.addr() as isize)
 }
+// !end code
 
 /// Aligns the pointer to specific size while making sure that the aligned pointer
 /// is still within the memory region owned by the original pointer. Check `ptr_byte_add_mut`
@@ -32,14 +36,17 @@ pub fn ptr_align(pointer: *mut usize, align_in_bytes: usize, owned_region_end: *
     ptr_byte_add_mut(pointer, offset_to_align, owned_region_end)
 }
 
+// !start spec(pointers_utility.ptr_byte_add_mut)
 /// Calculates the offset from a mutable raw pointer. This function guarantees that
 /// the returning pointer did not overflow and is within the owned memory region excluding
 /// the one-past-the-end address. The returned pointer is guaranteed to be valid for accesses
 /// of size one, if the original pointer is valid. Additional checks are required for making
 /// larger memory accesses.
 #[rr::ok]
-#[rr::requires("pointer.2 + offset_in_bytes < owned_region_end.2")]
+#[rr::requires("pointer.(loc_a) + offset_in_bytes < owned_region_end.(loc_a)")]
 #[rr::ensures("ret = (pointer +ₗ offset_in_bytes)")]
+// !end spec 
+// !start code(pointers_utility.ptr_byte_add_mut)
 pub fn ptr_byte_add_mut(
     pointer: *mut usize, offset_in_bytes: usize, owned_region_end: *const usize,
 ) -> Result<*mut usize, PointerError> {
@@ -54,17 +61,22 @@ pub fn ptr_byte_add_mut(
     }
     Ok(incremented_pointer)
 }
+// !end code
 
+// !start spec(pointers_utility.ptr_byte_add)
 /// Calculates the offset from a raw pointer. This function guarantees that
 /// the returning pointer did not overflow and is within the owned memory region excluding
 /// the one-past-the-end address. The returned pointer is guaranteed to be valid for accesses
 /// of size one, if the original pointer is valid. Additional checks are required for making
 /// larger memory accesses.
 #[rr::ok]
-#[rr::requires("pointer.2 + offset_in_bytes < owned_region_end.2")]
+#[rr::requires("pointer.(loc_a) + offset_in_bytes < owned_region_end.(loc_a)")]
 #[rr::ensures("ret = (pointer +ₗ offset_in_bytes)")]
+// !end spec
+// !start code(pointers_utility.ptr_byte_add)
 pub fn ptr_byte_add(
     pointer: *const usize, offset_in_bytes: usize, owned_region_end: *const usize,
 ) -> Result<*const usize, PointerError> {
     Ok(ptr_byte_add_mut(pointer as *mut usize, offset_in_bytes, owned_region_end)?)
 }
+// !end code

@@ -20,6 +20,7 @@ impl PageState for UnAllocated {}
 impl PageState for Allocated {}
 
 #[derive(Debug)]
+// !start spec(page.page)
 /// Specification:
 /// Mathematically, we model a `Page` as a triple `(page_loc, page_sz, page_val)`, where:
 /// - `page_loc` is the start address in memory,
@@ -32,29 +33,37 @@ impl PageState for Allocated {}
 #[rr::invariant("page_wf p")]
 /// We require the page to be in this bounded memory region that can be handled by the page
 /// allocator.
-#[rr::invariant("(page_end_loc p).2 ≤ MAX_PAGE_ADDR")]
+#[rr::invariant("(page_end_loc p).(loc_a) ≤ MAX_PAGE_ADDR")]
 /// We require the memory layout to have been initialized.
 #[rr::context("onceG Σ memory_layout")]
 #[rr::exists("MEMORY_CONFIG")]
 /// Invariant: The MEMORY_LAYOUT Once instance has been initialized to MEMORY_CONFIG.
 #[rr::invariant(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
 /// Invariant: ...and according to that layout, this page resides in confidential memory.
-#[rr::invariant("MEMORY_CONFIG.(conf_start).2 ≤ p.(page_loc).2")]
-#[rr::invariant("p.(page_loc).2 + (page_size_in_bytes_nat p.(page_sz)) ≤ MEMORY_CONFIG.(conf_end).2")]
+#[rr::invariant("MEMORY_CONFIG.(conf_start).(loc_a) ≤ p.(page_loc).(loc_a)")]
+#[rr::invariant("p.(page_loc).(loc_a) + (page_size_in_bytes_nat p.(page_sz)) ≤ MEMORY_CONFIG.(conf_end).(loc_a)")]
+// !end spec
 pub struct Page<S: PageState> {
     /// Specification: the `address` has mathematical value `l`.
+    // !start spec(page.page)
     #[rr::field("p.(page_loc)")]
+    // !end spec
     address: ConfidentialMemoryAddress,
     /// Specification: the `size` has mathematical value `sz`.
+    // !start spec(page.page)
     #[rr::field("p.(page_sz)")]
+    // !end spec
     size: PageSize,
     /// Specification: the `_marker` has no relevance for the verification.
+    // !start spec(page.page)
     #[rr::field("tt")]
+    // !end spec
     _marker: PhantomData<S>,
 }
 
 #[rr::context("onceG Σ memory_layout")]
 impl Page<UnAllocated> {
+    // !start spec(page.init)
     /// Creates a page token at the given address in the confidential memory.
     ///
     /// # Safety
@@ -73,26 +82,34 @@ impl Page<UnAllocated> {
     #[rr::requires("l `aligned_to` (page_size_align sz)")]
     /// Precondition: The page is located in a bounded memory region that can be handled by the
     /// page allocator.
-    #[rr::requires("l.2 + page_size_in_bytes_Z sz ≤ MAX_PAGE_ADDR")]
+    #[rr::requires("l.(loc_a) + page_size_in_bytes_Z sz ≤ MAX_PAGE_ADDR")]
     /// Precondition: The memory layout is initialized.
     #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     /// Precondition: The page is entirely contained in the confidential memory range.
-    #[rr::requires("MEMORY_CONFIG.(conf_start).2 ≤ l.2")]
-    #[rr::requires("l.2 + (page_size_in_bytes_nat sz) ≤ MEMORY_CONFIG.(conf_end).2")]
+    #[rr::requires("MEMORY_CONFIG.(conf_start).(loc_a) ≤ l.(loc_a)")]
+    #[rr::requires("l.(loc_a) + (page_size_in_bytes_nat sz) ≤ MEMORY_CONFIG.(conf_end).(loc_a)")]
     /// Then, we get a properly initialized page starting at `l` of size `sz` with some value `v`.
     #[rr::returns("mk_page l sz v")]
+    // !end spec
+    // !start code(page.init)
     pub(super) unsafe fn init(address: ConfidentialMemoryAddress, size: PageSize) -> Self {
         Self { address, size, _marker: PhantomData }
     }
+    // !end code
 
+    // !start spec(page.zeroize)
     /// Specification:
     /// We return a page starting at `l` with size `sz`, but with all bytes initialized to zero.
     #[rr::returns("mk_page self.(page_loc) self.(page_sz) (zero_page self.(page_sz))")]
+    // !end spec
+    // !start code(page.zeroize)
     pub fn zeroize(mut self) -> Page<Allocated> {
         self.clear();
         Page { address: self.address, size: self.size, _marker: PhantomData }
     }
+    // !end code
 
+    // !start spec(page.copy_from_non_confidential_memory)
     /// Moves a page to the Allocated state after filling its content with the
     /// content of a page located in the non-confidential memory.
     #[rr::only_spec]
@@ -100,15 +117,17 @@ impl Page<UnAllocated> {
     /// Precondition: We need to know the current memory layout.
     #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     /// Precondition: The region we are copying from is in non-confidential memory.
-    #[rr::requires("MEMORY_CONFIG.(non_conf_start).2 ≤ address.2")]
-    #[rr::requires("address.2 + page_size_in_bytes_Z self.(page_sz) ≤ MEMORY_CONFIG.(non_conf_end).2")]
+    #[rr::requires("MEMORY_CONFIG.(non_conf_start).(loc_a) ≤ address.(loc_a)")]
+    #[rr::requires("address.(loc_a) + page_size_in_bytes_Z self.(page_sz) ≤ MEMORY_CONFIG.(non_conf_end).(loc_a)")]
     /// Precondition: We require ownership over the memory region.
     #[rr::requires(#type "address" : "<#> v2" @ "array_t (page_size_in_words_nat self.(page_sz)) (int usize)")]
     /// Postcondition: We return ownership over the memory region.
     #[rr::ensures(#type "address" : "<#> v2" @ "array_t (page_size_in_words_nat self.(page_sz)) (int usize)")]
     /// Postcondition: We get a correctly initialized page token with the copied contents.
     #[rr::returns("Ok (mk_page self.(page_loc) self.(page_sz) v2)")]
+    // !end spec
     // TODO this needs to be unsafe
+    // !start code(page.copy_from_non_confidential_memory)
     pub fn copy_from_non_confidential_memory(mut self, mut address: NonConfidentialMemoryAddress) -> Result<Page<Allocated>, Error> {
         self.offsets().into_iter().try_for_each(|offset_in_bytes| {
             let non_confidential_address = MemoryLayout::read()
@@ -121,7 +140,9 @@ impl Page<UnAllocated> {
         })?;
         Ok(Page { address: self.address, size: self.size, _marker: PhantomData })
     }
+    // !end code
 
+    // !start spec(page.divide)
     /// Returns a collection of all smaller pages that fit within the current page and
     /// are correctly aligned. If this page is the smallest page (4KiB for RISC-V), then
     /// the same page is returned.
@@ -130,6 +151,8 @@ impl Page<UnAllocated> {
     #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some x)")]
     /// Postcondition: We get the subdivided pages.
     #[rr::ensures("subdivided_pages self ret")]
+    // !end spec
+    // !start code(page.divide)
     pub fn divide(self) -> Vec<Page<UnAllocated>> {
         let page_end = self.end_address_ptr();
         let smaller_page_size = self.size.smaller().unwrap_or(self.size);
@@ -139,10 +162,12 @@ impl Page<UnAllocated> {
         // NOTE: Currently using a wrapper around map, as we have to add an extra trait requirement
         // to the struct definition of Map to declare the invariant. Should be lifted soon.
         (0..number_of_smaller_pages).map(
+                // !end code
+                // !start spec(page.divide)
                 #[rr::params("v")]
                 // Precondition: the page bound is in confidential memory
-                #[rr::requires("Hpage_end" : "{page_end}.2 ≤ {*memory_layout}.(conf_end).2")]
-                #[rr::requires("Hpage_start" : "{*memory_layout}.(conf_start).2 ≤ {self.address}.2")]
+                #[rr::requires("Hpage_end" : "{page_end}.(loc_a) ≤ {*memory_layout}.(conf_end).(loc_a)")]
+                #[rr::requires("Hpage_start" : "{*memory_layout}.(conf_start).(loc_a) ≤ {self.address}.(loc_a)")]
                 // Precondition: the offset does not overflow
                 #[rr::requires("Hlarger_page" : "i * page_size_in_bytes_Z {smaller_page_size} ∈ usize")]
                 // Precondition: the base address is well-aligned
@@ -150,12 +175,14 @@ impl Page<UnAllocated> {
                 // Precondition: The memory layout needs to have been initialized.
                 #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some {*memory_layout})")]
                 // Precondition: the offset is within the bound
-                #[rr::requires("Hinrange" : "{self.address}.2 + (1 + i) * (page_size_in_bytes_Z {smaller_page_size}) ≤ {page_end}.2")]
-                #[rr::requires("Hinrange2" : "{page_end}.2 ≤ MAX_PAGE_ADDR")]
+                #[rr::requires("Hinrange" : "{self.address}.(loc_a) + (1 + i) * (page_size_in_bytes_Z {smaller_page_size}) ≤ {page_end}.(loc_a)")]
+                #[rr::requires("Hinrange2" : "{page_end}.(loc_a) ≤ MAX_PAGE_ADDR")]
                 // Precondition: ownership of this token's memory region
                 #[rr::requires(#type "({self.address} +ₗ (i * page_size_in_bytes_Z {smaller_page_size}))" : "<#> v" @ "array_t (page_size_in_words_nat {smaller_page_size}) (int usize)")]
                 // Postcondition: return new smaller page
                 #[rr::returns("mk_page ({self.address} +ₗ (i * page_size_in_bytes_Z {smaller_page_size})) {smaller_page_size} v")]
+                // !end spec
+                // !start code(page.divide)
                 |i: usize| {
                     let offset_in_bytes = i * smaller_page_size.in_bytes();
 
@@ -172,7 +199,9 @@ impl Page<UnAllocated> {
             )
             .collect()
     }
+    // !end code
 
+    // !start spec(page.merge)
     /// Merges a collection of contiguous pages into a single correctly aligned page.
     ///
     /// # Safety
@@ -192,6 +221,8 @@ impl Page<UnAllocated> {
     )]
     #[rr::requires("length from_pages = page_size_multiplier new_size")]
     #[rr::returns("mk_page base_address new_size (mjoin (page_val <$> from_pages))")]
+    // !end spec
+    // !start code(page.merge)
     pub unsafe fn merge(mut from_pages: Vec<Page<UnAllocated>>, new_size: PageSize) -> Self {
         assert!(from_pages.len() > 2);
         assert!(from_pages[0].address.is_aligned_to(new_size.in_bytes()));
@@ -204,18 +235,24 @@ impl Page<UnAllocated> {
         // - then merge the big array
         unsafe { Self::init(from_pages.swap_remove(0).address, new_size) }
     }
+    // !end code
 }
 
 #[rr::context("onceG Σ memory_layout")]
 impl Page<Allocated> {
+    // !start spec(page.deallocate)
     /// Clears the entire memory content by writing 0s to it and then converts the Page from Allocated to UnAllocated so it can be returned
     /// to the page allocator.
     #[rr::returns("mk_page self.(page_loc) self.(page_sz) (zero_page self.(page_sz))")]
+    // !end spec
+    // !start code(page.deallocate)
     pub fn deallocate(mut self) -> Page<UnAllocated> {
         self.clear();
         Page { address: self.address, size: self.size, _marker: PhantomData }
     }
+    // !end code
 
+    // !start spec(page.read)
     /// Reads data of size `size_of::<usize>` from a page at a given offset. Error is returned
     /// when an offset that exceeds page size is passed as an argument.
     ///
@@ -237,6 +274,8 @@ impl Page<Allocated> {
     #[rr::ensures("(offset_in_bytes = off' * ly_size usize)%Z")]
     /// ...the return value has been read from `v` at offset `off'`
     #[rr::ensures("self.(page_val) !! off' = Some ret")]
+    // !end spec
+    // !start code(page.read)
     pub fn read(&self, offset_in_bytes: usize) -> Result<usize, Error> {
         ensure!(offset_in_bytes % Self::ENTRY_SIZE == 0, Error::AddressNotAligned())?;
         let addr = self.end_address_ptr();
@@ -250,39 +289,61 @@ impl Page<Allocated> {
         };
         Ok(data)
     }
+    // !end code
 }
 
 #[rr::context("onceG Σ memory_layout")]
 impl<T: PageState> Page<T> {
     pub const ENTRY_SIZE: usize = mem::size_of::<usize>();
 
+    // !start spec(page.accessors)
     #[rr::returns("self.(page_loc)")]
+    // !end spec
+    // !start code(page.accessors)
     pub fn address(&self) -> &ConfidentialMemoryAddress {
         &self.address
     }
+    // !end code
 
+    // !start spec(page.accessors)
     #[rr::ensures("page_wf self")]
-    #[rr::returns("self.(page_loc).2")]
+    #[rr::returns("self.(page_loc).(loc_a)")]
+    // !end spec
+    // !start code(page.accessors)
     pub fn start_address(&self) -> usize {
         self.address.as_usize()
     }
+    // !end code
 
-    #[rr::returns("self.(page_loc).2 + page_size_in_bytes_Z self.(page_sz)")]
+    // !start spec(page.accessors)
+    #[rr::returns("self.(page_loc).(loc_a) + page_size_in_bytes_Z self.(page_sz)")]
+    // !end spec
+    // !start code(page.accessors)
     pub fn end_address(&self) -> usize {
         self.address.as_usize() + self.size.in_bytes()
     }
+    // !end code
 
+    // !start spec(page.accessors)
     #[rr::returns("self.(page_loc) +ₗ page_size_in_bytes_Z self.(page_sz)")]
+    // !end spec
+    // !start code(page.accessors)
     pub fn end_address_ptr(&self) -> *const usize {
         self.address().to_ptr().with_addr(self.end_address()) as *const usize
     }
+    // !end code
 
+    // !start spec(page.accessors)
     #[rr::ensures("page_wf self")]
     #[rr::returns("self.(page_sz)")]
+    // !end spec
+    // !start code(page.accessors)
     pub fn size(&self) -> PageSize {
         self.size
     }
+    // !end code
 
+    // !start spec(page.write)
     /// Writes data to a page at a given offset. Error is returned if an invalid offset was passed
     /// as an argument.
     ///
@@ -305,6 +366,8 @@ impl<T: PageState> Page<T> {
     #[rr::ensures("(offset_in_bytes = off' * ly_size usize)%Z")]
     /// Postcondition: self has been updated to contain the value `v2` at offset `off`
     #[rr::ensures("new_val = (<[Z.to_nat off' := value]> self.cur.(page_val))")]
+    // !end spec
+    // !start code(page.write)
     pub fn write(&mut self, offset_in_bytes: usize, value: usize) -> Result<(), Error> {
         ensure!(offset_in_bytes % Self::ENTRY_SIZE == 0, Error::AddressNotAligned())?;
         let addr = self.end_address_ptr();
@@ -318,6 +381,7 @@ impl<T: PageState> Page<T> {
         };
         Ok(())
     }
+    // !end code
 
     /// Extends the digest with the guest physical address and the content of the page.
     pub fn measure(&self, digest: &mut MeasurementDigest, guest_physical_address: usize) {
