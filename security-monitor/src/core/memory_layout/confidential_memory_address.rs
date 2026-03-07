@@ -79,7 +79,10 @@ impl ConfidentialMemoryAddress {
     // !end spec
     // !start code(confidential_memory_address.add)
     pub fn add(&self, offset_in_bytes: usize, upper_bound: *const usize) -> Result<ConfidentialMemoryAddress, Error> {
-        let pointer = ptr_byte_add_mut(self.0, offset_in_bytes, upper_bound).map_err(#[rr::verify] |_| Error::AddressNotInConfidentialMemory())?;
+        let pointer = ptr_byte_add_mut(self.0, offset_in_bytes, upper_bound).map_err(
+            #[rr::verify]
+            |_| Error::AddressNotInConfidentialMemory(),
+        )?;
         Ok(Self::new(pointer))
     }
     // !end code

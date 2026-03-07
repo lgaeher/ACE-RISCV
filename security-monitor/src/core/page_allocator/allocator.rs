@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 use spin::{Once, RwLock, RwLockWriteGuard};
 
 /// A static global structure containing unallocated pages. Once<> guarantees that the PageAllocator can only be initialized once.
-//#[rr::name("PAGE_ALLOCATOR")]
+#[rr::name("PAGE_ALLOCATOR")]
 static PAGE_ALLOCATOR: Once<RwLock<PageAllocator>> = Once::new();
 
 // !start spec(page_allocator.page_allocator)
@@ -55,7 +55,6 @@ impl PageAllocator {
     const NOT_INITIALIZED: &'static str = "Bug. Page allocator not initialized.";
 
     // !start spec(page_allocator.initialize)
-    #[rr::only_spec]
     /// Initializes the global memory allocator with the given memory region as confidential memory. Must be called only once during the
     /// system initialization.
     ///
@@ -77,10 +76,10 @@ impl PageAllocator {
     #[rr::requires("memory_end.(loc_a) ≤ page_size_in_bytes_Z Size128TiB")]
 
     /// Precondition: We have ownership of the memory range, having (memory_end - memory_start) bytes.
-    #[rr::requires(#type "memory_start" : "vs" @ "array_t (Z.to_nat (memory_end.(loc_a) - memory_start.(loc_a))) (int u8)")]
+    #[rr::requires(#type "memory_start" : "<#> vs" @ "array_t (Z.to_nat (memory_end.(loc_a) - memory_start.(loc_a))) (int u8)")]
 
     /// Precondition: The memory needs to be in confidential memory
-    #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
+    #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     #[rr::requires("MEMORY_CONFIG.(conf_start).(loc_a) ≤ memory_start.(loc_a)")]
     #[rr::requires("memory_end.(loc_a) ≤ MEMORY_CONFIG.(conf_end).(loc_a)")]
 
@@ -95,8 +94,10 @@ impl PageAllocator {
         ensure_not!(PAGE_ALLOCATOR.is_completed(), Error::Reinitialization())?;
         let mut page_allocator = Self::empty();
         unsafe { page_allocator.add_memory_region(memory_start, memory_end)? };
-        // NOTE: We initialize the invariant here.
-        PAGE_ALLOCATOR.call_once(|| RwLock::new(page_allocator));
+        PAGE_ALLOCATOR.call_once(
+            #[rr::verify]
+            || RwLock::new(page_allocator),
+        );
         Ok(())
     }
     // !end code
@@ -189,9 +190,7 @@ impl PageAllocator {
     /// Precondition: the whole memory region should be part of confidential memory
     #[rr::requires("MEMORY_CONFIG.(conf_start).(loc_a) ≤ memory_region_start.(loc_a)")]
     #[rr::requires("memory_region_end.(loc_a) ≤ MEMORY_CONFIG.(conf_end).(loc_a)")]
-
     #[rr::observe("self.ghost": "()")]
-
     #[rr::ok]
     /// Precondition: The memory range is within the region covered by the memory allocator.
     #[rr::requires("memory_region_end.(loc_a) ≤ page_size_in_bytes_Z Size128TiB")]
@@ -281,19 +280,29 @@ impl PageAllocator {
     // !end code
 
     // !start spec(page_allocator.acquire_page)
-    #[rr::only_spec]
     /// Returns a page token that has ownership over an unallocated memory region of the requested size. Returns error if it could not
     /// obtain write access to the global instance of the page allocator or if there are not enough page tokens satisfying the requested
     /// criteria.
+    #[rr::params("MEMORY_CONFIG" : "memory_layout")]
     /// Precondition: We require the page allocator to be initialized.
     #[rr::requires(#iris "once_initialized π \"PAGE_ALLOCATOR\" (Some ())")]
+    /// Precondition: We require the global memory layout to be initialized.
+    #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     /// Postcondition: If a page is returned, it has the right size.
-    #[rr::ok]
-    #[rr::ensures("ret.(page_sz) = page_size_to_allocate")]
+    #[rr::ensures("if_Ok ret (λ ret, ret.(page_sz) = page_size_to_allocate)")]
     // !end spec
     // !start code(page_allocator.acquire_page)
     pub fn acquire_page(page_size_to_allocate: PageSize) -> Result<Page<UnAllocated>, Error> {
-        Self::try_write(|page_allocator| {
+        Self::try_write(
+            // !end code
+            // !start spec(page_allocator.acquire_page)
+            #[rr::params("MEMORY_CONFIG" : "memory_layout")]
+            #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
+            #[rr::ok]
+            #[rr::ensures("if_Ok ret (λ tok, tok.(page_sz) = {page_size_to_allocate})")]
+            // !end spec
+            // !start code(page_allocator.acquire_page)
+            |page_allocator| {
             let base_address = page_allocator.base_address;
             let page_size = page_allocator.page_size;
             Ok(page_allocator.root.acquire_page_token(base_address, page_size, page_size_to_allocate))
@@ -302,15 +311,25 @@ impl PageAllocator {
     // !end code
 
     // !start spec(page_allocator.release_pages)
-    #[rr::only_spec]
     /// Consumes the page tokens given by the caller, allowing for their further acquisition. This is equivalent to deallocation of the
     /// physical memory region owned by the returned page tokens. Given vector of pages might contains pages of arbitrary sizes.
+    #[rr::params("MEMORY_CONFIG" : "memory_layout")]
     /// Precondition: We require the page allocator to be initialized.
     #[rr::requires(#iris "once_initialized π \"PAGE_ALLOCATOR\" (Some ())")]
+    /// Precondition: We require the global memory layout to be initialized.
+    #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     // !end spec
     // !start code(page_allocator.release_pages)
     pub fn release_pages(released_pages: Vec<Page<UnAllocated>>) {
-        let _ = Self::try_write(|page_allocator| {
+        let _ = Self::try_write(
+            // !end code
+            // !start spec(page_allocator.release_pages)
+            #[rr::params("MEMORY_CONFIG" : "memory_layout")]
+            #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
+            #[rr::returns("Ok tt")]
+            // !end spec
+            // !start code(page_allocator.acquire_page)
+            |page_allocator| {
             let base_address = page_allocator.base_address;
             let page_size = page_allocator.page_size;
             let root_node = &mut page_allocator.root;
@@ -318,32 +337,38 @@ impl PageAllocator {
                 // !end code
                 // !start spec(page_allocator.release_pages)
                 #[rr::params("γ")]
-                #[rr::inv_vars("root_node", "page_size", "base_address")]
-                #[rr::inv("base_address = 0%Z")]
-                #[rr::inv("page_size = Size128TiB")]
+                #[rr::inv_vars("root_node")]
                 #[rr::inv("root_node.ghost = γ")]
+                #[rr::inv("root_node.cur.(max_node_size) = Size128TiB")]
+                #[rr::inv("root_node.cur.(base_address) = 0%Z")]
                 #[rr::ignore]
                 #[allow(unused)]
                 || {};
                 // !end spec
                 // !start code(page_allocator.release_pages)
-                //
-                // NOTE: we show that the token is within range of the allocator, using the
-                // invariant of the page token.
+                
                 root_node.store_page_token(base_address, page_size, page_token);
             }
             Ok(())
-        })
-        .inspect_err(|_| debug!("Memory leak: failed to store released pages in the page allocator"));
+        }).unwrap();
+        //.inspect_err(|_| debug!("Memory leak: failed to store released pages in the page allocator"));
     }
     // !end code
-
-    #[rr::skip]
-    /// returns a mutable reference to the PageAllocator after obtaining a lock on the mutex
+    
+    // !start spec(page_allocator.try_write)
+    #[rr::params("p")]
+    #[rr::requires(#iris "once_initialized π \"PAGE_ALLOCATOR\" (Some ())")]
+    #[rr::requires(#iris "□ ∀ x, {O::Pre} π p op x")]
+    #[rr::exists("x")]
+    #[rr::ensures(#iris "{O::Post} π p op x ret")]
+    // !end spec
+    // !start code(page_allocator.try_write)
     fn try_write<F, O>(op: O) -> Result<F, Error>
     where O: FnOnce(&mut RwLockWriteGuard<'static, PageAllocator>) -> Result<F, Error> {
-        op(&mut PAGE_ALLOCATOR.get().expect(Self::NOT_INITIALIZED).write())
+        //op(&mut PAGE_ALLOCATOR.get().expect(Self::NOT_INITIALIZED).write())
+        op(&mut PAGE_ALLOCATOR.get().unwrap().write())
     }
+    // !end code
 }
 
 // !start spec(page_allocator.page_storage_node)
@@ -435,7 +460,7 @@ impl PageStorageTreeNode {
             assert!(this_node_base_address == page_token.start_address());
             assert!(this_node_page_size == page_token.size());
             // For verification: to unfold invariant.
-            &self.max_allocable_page_size;
+            let _ = &self.max_allocable_page_size;
 
             self.store_page_token_in_this_node(page_token);
         } else {
@@ -443,7 +468,7 @@ impl PageStorageTreeNode {
             self.initialize_children_if_needed(this_node_page_size);
 
             // For verification: to unfold invariant.
-            &self.max_allocable_page_size;
+            let _ = &self.max_allocable_page_size;
 
             // Calculate which child should we invoke recursively.
             let index = Self::calculate_child_index(this_node_base_address, this_node_page_size, &page_token);
@@ -468,7 +493,6 @@ impl PageStorageTreeNode {
     /// Recursively traverses the tree to reach a node that contains the page token of the requested size and returns this page token. This
     /// function returns also a set of page size that are not allocable anymore at the node. This method has the max depth of recusrive
     /// invocation equal to the number of PageSize variants. This method has an upper bounded computation complexity.
-    ///
     #[rr::params("memly" : "memory_layout")]
     /// Precondition: The size and base address arguments match the logical state.
     #[rr::requires("this_node_base_address = self.cur.(base_address)")]
@@ -520,7 +544,9 @@ impl PageStorageTreeNode {
                 .position(
                     // !end code
                     // !start spec(page_allocator.acquire_page_token)
-                    #[rr::returns("bool_decide ((Some {page_size_to_acquire}) ≤o{ option_cmp page_size_cmp } page_node_can_allocate node)")]
+                    #[rr::returns(
+                        "bool_decide ((Some {page_size_to_acquire}) ≤o{ option_cmp page_size_cmp } page_node_can_allocate node)"
+                    )]
                     // !end spec
                     // !start code(page_allocator.acquire_page_token)
                     |node| node.max_allocable_page_size >= Some(page_size_to_acquire),
@@ -551,12 +577,14 @@ impl PageStorageTreeNode {
     // !end code
 
     // !start spec(page_allocator.initialize_children_if_needed)
-    #[rr::only_spec]
     /// Creates children for the given node because the node gets created with an empty list of children, expecting that children will be
     /// created lazily with this function.
     ///
-    /// Precondition the page size argument has to match the node's logical state.
+    #[rr::params("smaller_sz")]
+    /// Precondition: the page size argument has to match the node's logical state.
     #[rr::requires("this_node_page_size = self.cur.(max_node_size)")]
+    /// Precondition: there is a smaller page size.
+    #[rr::requires("Hsmaller" : "page_size_smaller this_node_page_size = Some smaller_sz")]
     /// Postcondition: leaves the page node unchanged except for initializing the children if necessary
     #[rr::observe("self.ghost": "mk_page_node self.cur.(max_node_size) self.cur.(base_address) self.cur.(allocation_state) true")]
     // !end spec
@@ -567,12 +595,9 @@ impl PageStorageTreeNode {
                 .map(
                     // !end code
                     // !start spec(page_allocator.initialize_children_if_needed)
-                    // I think to handle this well I'll need invariants on closures.
-                    // i.e., the address and so on need to become logical components of the type (even
-                    // though they don't have a physical representation)
-                    #[rr::skip]
                     #[rr::params("base_address", "node_size")]
                     #[rr::requires("(page_size_align node_size | base_address)%Z")]
+                    #[rr::requires("base_address + (page_size_in_bytes_nat node_size) ≤ MaxInt usize")]
                     #[rr::returns("mk_page_node node_size base_address PageTokenUnavailable false")]
                     // !end spec
                     // !start code(page_allocator.initialize_children_if_needed)
@@ -670,12 +695,14 @@ impl PageStorageTreeNode {
     // !end code
 
     // !start spec(page_allocator.try_to_merge_page_tokens)
-    #[rr::only_spec]
     /// Merges page tokens owned by children.
     /// Safety: Requires that all children have been initialized.
     ///
+    #[rr::params("smaller_sz")]
     /// Precondition: The children are initialized.
-    #[rr::requires("self.cur.(children_initialized)")]
+    #[rr::requires("Hchild_init" : "self.cur.(children_initialized)")]
+    /// Precondition: There is a smaller page size.
+    #[rr::requires("Hsmaller" : "page_size_smaller this_node_page_size = Some smaller_sz")]
     /// Precondition: the argument page size matches the node's page size
     #[rr::requires("this_node_page_size = self.cur.(max_node_size)")]
     /// Postcondition: this node has been updated to a new state.
@@ -686,7 +713,7 @@ impl PageStorageTreeNode {
     // !end spec
     // !start code(page_allocator.try_to_merge_page_tokens)
     unsafe fn try_to_merge_page_tokens(&mut self, this_node_page_size: PageSize) {
-        if self.children.iter().all(
+        if vec_iter(&self.children).all(
             // !end code
             // !start spec(page_allocator.try_to_merge_page_tokens)
             #[rr::returns("bool_decide (child.(allocation_state) = PageTokenAvailable)")]
@@ -695,22 +722,9 @@ impl PageStorageTreeNode {
             |child| child.page_token.is_some(),
         ) {
             // All children have page tokens, thus we can merge them.
-            let pages_to_merge = self.children.iter_mut().map(
+            let pages_to_merge = vec_iter_mut(&mut self.children).map(
                     // !end code
                     // !start spec(page_allocator.try_to_merge_page_tokens)
-                    // postcondition of the closure has the observation.
-                    // iter_mut hands out mutable borrows. 
-                    // Options: 
-                    // - we immediately return the obsevation to the base iterator and allow it to
-                    // resolve, 
-                    // - or we collect a bigsep of observations and resolve it at the end.
-                    //
-                    // We might want to create the list gnames already at the very beginning when
-                    // creating the iterator via iter_mut. 
-                    // We can keep the observations as part of the invariant, I suppose.
-                    // Then we finally get the completed invariant, and the observation of having
-                    // turned the vector into a list of PlaceGhost.
-                    // At this point, resolve everything. 
                     #[rr::requires("child.cur.(allocation_state) = PageTokenAvailable")]
                     #[rr::ensures("ret.(page_sz) = child.cur.(max_node_size)")]
                     #[rr::ensures("ret.(page_loc).(loc_a) = child.cur.(base_address)")]
@@ -719,9 +733,11 @@ impl PageStorageTreeNode {
                     // !start code(page_allocator.try_to_merge_page_tokens)
                     |child| child.acquire_page_token_from_this_node()
                     ).collect();
+            self.max_allocable_page_size = None;
+
             // Safety: Safe, because all children are initialized and have a page token available.
             self.store_page_token_in_this_node(unsafe { Page::merge(pages_to_merge, this_node_page_size) });
-            self.max_allocable_page_size = Some(this_node_page_size);
+            assert!(self.max_allocable_page_size == Some(this_node_page_size));
         }
     }
     // !end code
@@ -794,5 +810,15 @@ mod wrappers {
     pub fn vec_iter<T>(x: &Vec<T>) -> core::slice::Iter<'_, T> {
         x.iter()
     }
+
+    #[rr::only_spec]
+    #[rr::exists("γs")]
+    #[rr::ensures("length γs = length x.cur")]
+    #[rr::observe("x.ghost": "(PlaceGhost <$> γs) : list (place_rfn {rt_of T})")]
+    #[rr::returns("zip x.cur γs")]
+    pub fn vec_iter_mut<T>(x: &mut Vec<T>) -> core::slice::IterMut<'_, T> {
+        x.iter_mut()
+    }
+
 }
 use wrappers::*;

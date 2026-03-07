@@ -33,7 +33,7 @@ impl PageState for Allocated {}
 #[rr::invariant("page_wf p")]
 /// We require the page to be in this bounded memory region that can be handled by the page
 /// allocator.
-#[rr::invariant("(page_end_loc p).(loc_a) ≤ MAX_PAGE_ADDR")]
+#[rr::invariant("0 ≤ p.(page_loc).(loc_a) ∧ (page_end_loc p).(loc_a) ≤ MAX_PAGE_ADDR")]
 /// We require the memory layout to have been initialized.
 #[rr::context("onceG Σ memory_layout")]
 #[rr::exists("MEMORY_CONFIG")]
@@ -217,7 +217,7 @@ impl Page<UnAllocated> {
     #[rr::requires(
         "∀ (i : nat) pg, from_pages !! i = Some pg → 
         Some pg.(page_sz) = page_size_smaller new_size ∧
-        pg.(page_loc) = base_address +ₗ (i * page_size_in_bytes_Z pg.(page_sz))"
+        pg.(page_loc).(loc_a) = base_address.(loc_a) + (i * page_size_in_bytes_Z pg.(page_sz))"
     )]
     #[rr::requires("length from_pages = page_size_multiplier new_size")]
     #[rr::returns("mk_page base_address new_size (mjoin (page_val <$> from_pages))")]

@@ -134,8 +134,8 @@ Proof.
   repeat liRStep. liShow.
   liInst Hevar_rf (mk_page_node self.(max_node_size) self.(base_address) new_state true).
   repeat liRStep.
-  liInst Hevar_rf (mk_page_node (max_node_size self) (base_address self) x'1 true).
-  rename x'1 into updated_node_state.
+  liInst Hevar_rf (mk_page_node (max_node_size self) (base_address self) x'2 true).
+  rename x'2 into updated_node_state.
   repeat liRStep.
 
   all: print_remaining_goal.
@@ -168,9 +168,6 @@ Proof.
   - eexists. done.
   - erewrite page_storage_node_invariant_case_can_allocate; last done.
     by eapply page_node_invariant_case_sized_bounded.
-  (*- destruct Hsz_le as [Hsz_lt | Hsz_eq%Z.ord_eq_iff].*)
-    (*+ lia.*)
-    (*+ apply page_size_variant_inj in Hsz_eq. done.*)
   - rewrite -page_size_align_is_size.
     eexists. done.
   - destruct INV_WF as [INV_WF1 INV_WF2].
@@ -209,8 +206,8 @@ Proof.
     { assert (Z.to_nat child_index < length children); last solve_goal.
       rewrite INV_INIT_CHILDREN.
       specialize (page_size_multiplier_ge (max_node_size self)); lia. }
-    rename select (page_node_can_allocate r' = _) into Heq1.
-    rename select (max_node_size r' = _) into Heq2.
+    rename select (page_node_can_allocate x'1 = _) into Heq1.
+    rename select (max_node_size x'1 = _) into Heq2.
     rewrite Heq1 Heq2. solve_goal.
   - eexists. done.
   - opose proof (list_lookup_lookup_total_lt children (Z.to_nat child_index) _) as Hlook_child.

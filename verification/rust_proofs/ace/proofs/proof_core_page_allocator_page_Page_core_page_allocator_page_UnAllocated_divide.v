@@ -12,6 +12,7 @@ Lemma core_page_allocator_page_Page_core_page_allocator_page_UnAllocated_divide_
 Proof.
   core_page_allocator_page_Page_core_page_allocator_page_UnAllocated_divide_prelude.
 
+  (* !start proof(page.divide) *)
   rep <-! liRStep. liShow.
   apply_update (updateable_copy_lft "plft27" "plft31").
   rep <-! liRStep. liShow.
@@ -22,7 +23,6 @@ Proof.
   apply_update (updateable_copy_lft "plft30" "plft34").
   rep <-! liRStep. liShow.
 
-  (* !start proof(page.divide) *)
   rename self1 into pageval.
   rename self0 into sz.
   set (smaller_sz := default sz (page_size_smaller sz)).
@@ -51,13 +51,13 @@ Proof.
     ⌜smaller_sz' = smaller_sz⌝ ∗
     once_status "MEMORY_LAYOUT" (Some memly) ∗
     [∗ list] i ∈ seq itstart (itend - itstart)%nat,
-    ((startloc +ₗ (i * page_size_in_bytes_Z smaller_sz)) ◁ₗ[π, Owned false]
+    ((startloc +ₗ (i * page_size_in_bytes_Z smaller_sz)) ◁ₗ[π, Owned]
       # (<#> (take (page_size_in_words_nat smaller_sz)
         (drop (i * page_size_in_words_nat smaller_sz) pageval))) @ ◁ array_t (page_size_in_words_nat smaller_sz) (int usize))
   ) : iProp Σ)%I).
 
-  rep liRStep; liShow.
-  liInst Hevar_x1 INV.
+  repeat liRStep; liShow.
+  liInst Hevar_Inv INV.
 
   (* Prove initialization of the invariant *)
   unfold INV at 1.
@@ -109,8 +109,9 @@ Proof.
     destruct len. { exfalso. move: Hcmp_eq Heq_len Hstart Hend. lia. }
     iDestruct "Hinv" as "(#Hinv0 & Hinv1 & Hinv)".
     fold seq.
+    iExists ( *[take (page_size_in_words_nat smaller_sz) (drop (Z.to_nat istart * page_size_in_words_nat smaller_sz) pageval)]).
     iSplitL "Hinv0 Hinv1".
-    { iExists _, istart, inhabitant, _, _, _, _. iR. iR.
+    { iExists _, istart, inhabitant, _, _, _, _. iR. iR. iR.
       unfold name_hint. iFrame "#".
       iSplitR. { iPureIntro. simpl. lia. }
       iSplitR. { iPureIntro. lia. }
@@ -133,13 +134,15 @@ Proof.
         rewrite (page_size_multiplier_size_in_bytes sz smaller_sz); last done.
         move: Hcmp_eq. clear. nia. }
       iSplitR. { iPureIntro. simpl. lia. }
-      rewrite Z2Nat.id; first done. lia. }
+      rewrite Z2Nat.id; last lia. iL. done. }
     iIntros (e' (capture_smaller_sz & capture_memlayout & capture_start & capture_end & [])).
-    iIntros "(%v' & %i & % & % & % & % & % & %Heq1 & %Heq2 & -> & %Heq3)".
+    rewrite boringly_persistent_elim.
+    iIntros "(%v' & %i & % & % & % & % & % & %Heq0 & %Heq1 & %Heq2 & (-> & %Heq3) & _)".
+    injection Heq0 as <-.
     injection Heq2 as <-.
     injection Heq1 as <- <- <- <-.
     injection Heq3 as -> -> -> ->.
-    simpl. iSplitR. { iPureIntro. lia. }
+    simpl. iL. iSplitR. { iPureIntro. lia. }
     iR. iR. iR. iR. iR.
     replace ((S (Z.to_nat istart))) with (Z.to_nat (istart + 1%nat)); first last.
     { clear -Hstart. lia. }
@@ -155,16 +158,9 @@ Proof.
     rewrite boringly_persistent_elim. iDestruct "Hnext" as "%Hnext".
     simpl in Hnext. destruct Hnext as (<- & (Ha & <-) & _).
     injection Ha as <-.
-    iIntros "Hinv". done.
+    iIntros "Hinv". iL. done.
   }
-  rep <-! liRStep. liShow.
-
-  rep liRStep. liShow.
-  iApply prove_with_subtype_default.
-  iRename select (MapInv _ _ _ _ _) into "Hinv".
-  iSplitL "Hinv". { done. }
-
-  rep <-! liRStep.
+  rep <-! liRStep. 
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
