@@ -285,6 +285,16 @@ Proof.
   specialize (page_size_in_words_nat_ge sz).
   lia.
 Qed.
+Lemma page_size_in_bytes_nat_in_isize sz :
+  (Z.of_nat $ page_size_in_bytes_nat sz) ∈ isize.
+Proof.
+  rewrite /page_size_in_bytes_nat page_size_in_words_nat_unfold /page_size_in_words_nat_def.
+  rewrite bytes_per_addr_eq.
+  split.
+  all: unsafe_unfold_common_caesium_defs.
+  all: unfold it_signed, it_byte_size_log, bytes_per_addr_log.
+  all: destruct sz; try lia.
+Qed.
 Lemma page_size_in_bytes_nat_in_usize sz :
   (Z.of_nat $ page_size_in_bytes_nat sz) ∈ usize.
 Proof.

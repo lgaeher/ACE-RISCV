@@ -338,9 +338,11 @@ Definition page_storage_node_invariant_case
       (* No allocation is possible *)
       maybe_page_token = None ∧ max_sz = None
 
+      (* NOTE: This (and the matching requirement in the Available state below) are quite annoying to establish.
+         If we do `store_page_token_in_this_node`, we have to traverse the whole subtree and use reasoning about
+         exclusivity of memory ownership in order to get this. *)
       (* all children are unavailable *)
-      (* TODO do we need this *)
-      (*Forall (λ child, child.(allocation_state) = PageTokenUnavailable) children*)
+      (*∧ Forall (λ child, child.(allocation_state) = PageTokenUnavailable) children*)
   else if decide (node.(allocation_state) = PageTokenAvailable)
   then
       (* This node is completely available *)
@@ -353,7 +355,7 @@ Definition page_storage_node_invariant_case
         token.(page_loc).(loc_a) = node.(base_address) ∧
         token.(page_sz) = node.(max_node_size)
         (* all children are unavailable *)
-        (*Forall (λ child, child.(allocation_state) = PageTokenUnavailable) children*)
+        (*∧ Forall (λ child, child.(allocation_state) = PageTokenUnavailable) children*)
   else
 
       (* This node is partially available with initialized children *)
@@ -438,7 +440,7 @@ Lemma page_storage_node_invariant_no_tok node max_sz children :
 Proof.
   unfold page_storage_node_invariant_case.
   repeat case_decide; [ | solve_goal..].
-  intros [_ ->].
+  intros (_ & ->).
   split; first done.
   congruence.
 Qed.

@@ -11,6 +11,8 @@ use core::marker::PhantomData;
 use core::mem;
 use core::ops::Range;
 
+use crate::rr_wrappers::*;
+
 pub trait PageState {}
 
 pub struct UnAllocated {}
@@ -210,30 +212,33 @@ impl Page<UnAllocated> {
     /// * Merged pages are contiguous and cover the entire new size of the future page
     /// * Merged pages are of the same size
     /// * Merged pages are sorted
-    #[rr::only_spec]
-    #[rr::params("base_address" : "loc")]
-    #[rr::requires("base_address = (from_pages !!! 0%nat).(page_loc)")]
-    #[rr::requires("(from_pages !!! 0%nat).(page_loc) `aligned_to` page_size_align new_size")]
-    #[rr::requires(
-        "∀ (i : nat) pg, from_pages !! i = Some pg → 
-        Some pg.(page_sz) = page_size_smaller new_size ∧
+    #[rr::params("base_address" : "loc", "smaller_sz")]
+    #[rr::requires("Hsmaller": "page_size_smaller new_size = Some smaller_sz")]
+    #[rr::requires("Hlen": "length from_pages = page_size_multiplier new_size")]
+    #[rr::requires("Hbase_addr": "base_address = (from_pages !!! 0%nat).(page_loc)")]
+    #[rr::requires("Haligned": "(from_pages !!! 0%nat).(page_loc) `aligned_to` page_size_align new_size")]
+    #[rr::requires("Hlook":
+        "∀ (i : nat) pg, from_pages !! i = Some pg →
+        pg.(page_sz) = smaller_sz ∧
         pg.(page_loc).(loc_a) = base_address.(loc_a) + (i * page_size_in_bytes_Z pg.(page_sz))"
     )]
-    #[rr::requires("length from_pages = page_size_multiplier new_size")]
     #[rr::returns("mk_page base_address new_size (mjoin (page_val <$> from_pages))")]
     // !end spec
     // !start code(page.merge)
     pub unsafe fn merge(mut from_pages: Vec<Page<UnAllocated>>, new_size: PageSize) -> Self {
-        assert!(from_pages.len() > 2);
-        assert!(from_pages[0].address.is_aligned_to(new_size.in_bytes()));
-        assert!(new_size.in_bytes() / from_pages[0].size.in_bytes() == from_pages.len());
-        assert!(from_pages[0].start_address() + new_size.in_bytes() == from_pages[from_pages.len() - 1].end_address());
+        let base_address = vec_index(&from_pages, 0).address;
+        let smaller_sz = vec_index(&from_pages, 0).size;
+        let pages_len = from_pages.len();
+        assert!(base_address.is_aligned_to(new_size.in_bytes()));
+        assert!(new_size.in_bytes() / smaller_sz.in_bytes() == pages_len);
+        assert!(base_address.as_usize() + new_size.in_bytes() == vec_index(&from_pages, pages_len - 1).end_address());
+        assert!(pages_len > 2);
 
         // NOTE: logically, this is a big step.
         // - We need to go over the whole vector and get the ownership.
         // - From each page, we extract the ownership
         // - then merge the big array
-        unsafe { Self::init(from_pages.swap_remove(0).address, new_size) }
+        unsafe { Self::init(base_address, new_size) }
     }
     // !end code
 }

@@ -14,8 +14,12 @@ use alloc::vec;
 use alloc::vec::Vec;
 use spin::{Once, RwLock, RwLockWriteGuard};
 
+use crate::rr_wrappers::*;
+
 /// A static global structure containing unallocated pages. Once<> guarantees that the PageAllocator can only be initialized once.
+// !start spec(page_allocator.page_allocator)
 #[rr::name("PAGE_ALLOCATOR")]
+// !end spec
 static PAGE_ALLOCATOR: Once<RwLock<PageAllocator>> = Once::new();
 
 // !start spec(page_allocator.page_allocator)
@@ -346,7 +350,7 @@ impl PageAllocator {
                 || {};
                 // !end spec
                 // !start code(page_allocator.release_pages)
-                
+
                 root_node.store_page_token(base_address, page_size, page_token);
             }
             Ok(())
@@ -354,7 +358,7 @@ impl PageAllocator {
         //.inspect_err(|_| debug!("Memory leak: failed to store released pages in the page allocator"));
     }
     // !end code
-    
+
     // !start spec(page_allocator.try_write)
     #[rr::params("p")]
     #[rr::requires(#iris "once_initialized π \"PAGE_ALLOCATOR\" (Some ())")]
@@ -733,11 +737,12 @@ impl PageStorageTreeNode {
                     // !start code(page_allocator.try_to_merge_page_tokens)
                     |child| child.acquire_page_token_from_this_node()
                     ).collect();
-            self.max_allocable_page_size = None;
 
             // Safety: Safe, because all children are initialized and have a page token available.
-            self.store_page_token_in_this_node(unsafe { Page::merge(pages_to_merge, this_node_page_size) });
-            assert!(self.max_allocable_page_size == Some(this_node_page_size));
+            let merged_token = unsafe { Page::merge(pages_to_merge, this_node_page_size) };
+            assert!(merged_token.size() == this_node_page_size);
+            self.page_token = Some(merged_token);
+            self.max_allocable_page_size = Some(this_node_page_size);
         }
     }
     // !end code
@@ -787,38 +792,3 @@ impl PageStorageTreeNode {
     }
     // !end code
 }
-
-/// These wrappers serve as a temporary workaround until RefinedRust supports unsized types and in
-/// particular slices: the indexing and iteration methods on `Vec` work by dereferencing to slices,
-/// which currently are not supported by RefinedRust.
-/// For now, we thus create wrappers for these methods to which we can attach RefinedRust
-/// specifications.
-mod wrappers {
-    use alloc::vec::Vec;
-
-    #[rr::only_spec]
-    #[rr::requires("index < length x.cur")]
-    #[rr::exists("γi")]
-    #[rr::returns("(x.cur !!! Z.to_nat index, γi)")]
-    #[rr::observe("x.ghost": "<[Z.to_nat index := PlaceGhost γi]> (<$#> x.cur)")]
-    pub fn vec_index_mut<T>(x: &mut Vec<T>, index: usize) -> &mut T {
-        &mut x[index]
-    }
-
-    #[rr::only_spec]
-    #[rr::returns("x")]
-    pub fn vec_iter<T>(x: &Vec<T>) -> core::slice::Iter<'_, T> {
-        x.iter()
-    }
-
-    #[rr::only_spec]
-    #[rr::exists("γs")]
-    #[rr::ensures("length γs = length x.cur")]
-    #[rr::observe("x.ghost": "(PlaceGhost <$> γs) : list (place_rfn {rt_of T})")]
-    #[rr::returns("zip x.cur γs")]
-    pub fn vec_iter_mut<T>(x: &mut Vec<T>) -> core::slice::IterMut<'_, T> {
-        x.iter_mut()
-    }
-
-}
-use wrappers::*;
