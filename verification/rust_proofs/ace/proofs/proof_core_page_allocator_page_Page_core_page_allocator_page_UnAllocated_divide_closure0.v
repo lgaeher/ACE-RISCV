@@ -13,6 +13,7 @@ Proof.
   core_page_allocator_page_Page_core_page_allocator_page_UnAllocated_divide_closure0_prelude.
 
   rep <-! liRStep; liShow.
+  (* !start proof(page.divide) *)
   apply_update (updateable_copy_lft "vlft7" "ulft5").
   rep <-! liRStep; liShow.
   apply_update (updateable_copy_lft "plft21" "vlft7").
@@ -29,6 +30,7 @@ Proof.
   rep <-! liRStep. liShow.
   apply_update (updateable_copy_lft "vlft30" "ulft5").
   rep liRStep.
+  (* !end proof *)
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.

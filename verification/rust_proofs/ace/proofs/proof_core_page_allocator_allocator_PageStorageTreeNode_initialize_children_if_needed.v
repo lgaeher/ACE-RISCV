@@ -13,6 +13,7 @@ Proof.
   core_page_allocator_allocator_PageStorageTreeNode_initialize_children_if_needed_prelude.
 
   rep <-! liRStep; liShow.
+  (* !start proof(page_allocator.initialize_children_if_needed) *)
   { rep liRStep; liShow.
     (* pick map invariant *)
     liInst Hevar_Inv (λ π '(i, b) _, ⌜i ≤ page_size_multiplier self.(max_node_size)⌝ ∗ ⌜b = Z.of_nat $ page_size_multiplier self.(max_node_size)⌝)%I.
@@ -30,10 +31,12 @@ Proof.
     liInst Hevar_rf self.
     rep liRStep.
   }
+  (* !end proof *)
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   Unshelve. all: sidecond_hammer.
+  (* !start proof(page_allocator.initialize_children_if_needed) *)
   all: try rename select (Forall2 _ _ _) into Hf.
   - rewrite /number_of_smaller_pages Hsmaller. lia.
   - unfold child_base_address.
@@ -80,6 +83,7 @@ Proof.
   - eexists. done.
   - destruct self as [??? children_init]. simpl in *.
     destruct children_init; done.
+  (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
 Qed.

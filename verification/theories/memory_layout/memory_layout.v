@@ -2,6 +2,7 @@ From refinedrust Require Import typing.
 
 (** * Additional definitions for the security monitor's global memory layout *)
 
+(* !start spec(memory_layout.memory_layout) *)
 Record memory_layout : Type := mk_memory_layout {
   conf_start : loc;
   conf_end : loc;
@@ -19,3 +20,4 @@ Global Program Instance memory_layout_inhabited : Inhabited memory_layout :=
   populate (mk_memory_layout 
     NULL_loc NULL_loc NULL_loc NULL_loc _ _ _ _).
 Solve Obligations with split; unsafe_unfold_common_caesium_defs; sidecond_hammer.
+(* !end spec *)

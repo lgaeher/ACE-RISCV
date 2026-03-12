@@ -13,6 +13,7 @@ Proof.
   core_page_allocator_allocator_PageAllocator_try_write_prelude.
 
   rep <-! liRStep; liShow.
+  (* !start proof(page_allocator.try_write) *)
   rep liRStep. liShow.
   iRename select (∀ _, FnOnce_Pre _ _ _ _ _)%I into "Hpre".
   liInst Hevar_x1 p.
@@ -21,6 +22,7 @@ Proof.
   rep liRStep. liShow.
   liInst Hevar_x2 γ0.
   rep liRStep.
+  (* !end proof *)
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.

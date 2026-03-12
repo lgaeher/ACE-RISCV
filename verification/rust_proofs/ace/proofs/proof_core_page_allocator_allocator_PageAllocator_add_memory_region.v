@@ -29,11 +29,12 @@ Proof.
     liRStepUntil typed_call.
     iRename select (larr ◁ₗ[_, _] _ @ (◁ _))%I into "Harr".
     iApply fupd_typed_call.
-    iMod (ltype_own_array_subtype_strong _ _ _ _ (int usize) with "[] Harr") as "(% & Harr)"; [done | | | | | ].
+    iMod (ltype_own_array_subtype_strong _ _ _ _ (int usize) _ _ _ (λ _ _, True%I) with "[] Harr") as "(% & _ & Harr)"; [done | | | | | ].
     { shelve_sidecond. }
     { solve_layout_alg. }
     { shelve_sidecond. }
-    { iModIntro. iIntros (??) "Harr". iPoseProof (ty_own_val_array_int_to_int with "Harr") as "$"; last done.
+    { iModIntro. iIntros (??? _) "Harr". 
+      iPoseProof (ty_own_val_array_int_to_int with "Harr") as "(% & $)"; last done.
       shelve_sidecond. }
     iModIntro.
     repeat liRStep. }

@@ -7,20 +7,7 @@ Set Default Proof Using "Type".
 Section proof.
 Context `{RRGS : !refinedrustGS Σ}.
 
-(* TODO move *)
-Lemma max_list_cmp_elem_of {A} (cmp : A → A → comparison) xs def :
-  max_list_cmp cmp xs def = def ∨ ∃ x, max_list_cmp cmp xs def = Some x ∧ x ∈ xs.
-Proof.
-induction xs as [ | x xs IH] in def |-*; simpl; first by left.
-  destruct (IH (max_by (option_cmp cmp) def (Some x))) as [Hdef | (y & Hmax & Hel)].
-  - rewrite Hdef. destruct def as [def | ]; simpl.
-    + rewrite max_by_Some.
-      unfold max_by. destruct (cmp def x); last by left.
-      all: right; set_solver.
-    + right. rewrite max_by_None_l. set_solver.
-  - rewrite Hmax. right. set_solver.
-Qed.
-
+(* !start proof(page_allocator.acquire_page_token) *)
 Lemma update_allocation_state_inv self new_state max_alloc max_allocs children child_size :
   max_allocs = fmap page_node_can_allocate children →
   max_alloc = max_list_cmp (option_cmp page_size_cmp) max_allocs None →
@@ -86,6 +73,7 @@ Proof.
     rewrite Halloc. move: Havail.
     unfold ord_ge, ord_le. solve_goal.
 Qed.
+(* !end proof *)
 
 Lemma core_page_allocator_allocator_PageStorageTreeNode_acquire_page_token_proof (π : thread_id) :
   core_page_allocator_allocator_PageStorageTreeNode_acquire_page_token_lemma π.
@@ -93,6 +81,7 @@ Proof.
   core_page_allocator_allocator_PageStorageTreeNode_acquire_page_token_prelude.
 
   repeat liRStep; liShow.
+  (* !start proof(page_allocator.acquire_page_token) *)
   { liInst Hevar_rf self. repeat liRStep; liShow. }
   2: { liInst Hevar_rf self. repeat liRStep; liShow. }
 
@@ -286,6 +275,7 @@ Proof.
     move: Hsz_acquire_bound.
     rewrite Halloc.
     solve_goal.
+  (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
 Admitted. (* admitted due to long Qed *)

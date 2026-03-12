@@ -7,14 +7,13 @@ Set Default Proof Using "Type".
 Section proof.
 Context `{RRGS : !refinedrustGS Σ}.
 
-Hint Rewrite @fst_zip @snd_zip using lia : lithium_rewrite.
-
 Lemma core_page_allocator_allocator_PageStorageTreeNode_try_to_merge_page_tokens_proof (π : thread_id) :
   core_page_allocator_allocator_PageStorageTreeNode_try_to_merge_page_tokens_lemma π.
 Proof.
   core_page_allocator_allocator_PageStorageTreeNode_try_to_merge_page_tokens_prelude.
 
   rep <-! liRStep; liShow.
+  (* !start proof(page_allocator.try_to_merge_page_tokens) *)
   rep liRStep; liShow.
   { liInst Hevar_x2 (λ child, child.(allocation_state) = PageTokenAvailable).
     rep liRStep. }
@@ -35,7 +34,7 @@ Proof.
   { admit. }
 
   rep liRStep; liShow.
-  liInst Hevar_x2 l3.
+  liInst Hevar_x0 l3.
   rep liRStep; liShow.
   liInst Hevar_rf (mk_page_node self.(max_node_size) self.(base_address) PageTokenAvailable true).
   rep liRStep; liShow.
@@ -43,7 +42,7 @@ Proof.
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   Unshelve. all: sidecond_hammer.
-  all: rename x' into children.
+  all: try rename x'1 into children.
   all: try rename l3 into tokens.
   all: try rename select (Forall2 _ _ tokens) into Hf.
   all: rewrite Hchild_init in INV_INIT_CHILDREN.
@@ -61,6 +60,8 @@ Proof.
     clear -Hf.
     rewrite snd_zip; first done.
     lia.
+  - opose proof* Forall2_length as Hlen; first apply Hf.
+    rewrite -Hlen length_zip. lia.
   - opose proof* Forall2_length as Hlen; first apply Hf.
     rewrite length_zip Nat.min_l in Hlen; last lia.
     specialize (page_size_multiplier_ge (max_node_size self)) as Hge.
@@ -116,8 +117,6 @@ Proof.
     rewrite Hsz' Hchild_sz.
     rewrite /child_base_address.
     simpl. clear. nia.
-  - opose proof* Forall2_length as Hlen; first apply Hf.
-    rewrite -Hlen length_zip. lia.
   - apply page_storage_node_children_wf_upd_state; last done.
     simpl. solve_goal.
   - eexists. done.
@@ -140,6 +139,7 @@ Proof.
     rewrite Hchild_addr.
     rewrite /child_base_address/=.
     rewrite Z.mul_0_r Z.add_0_r//.
+  (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
 Qed.

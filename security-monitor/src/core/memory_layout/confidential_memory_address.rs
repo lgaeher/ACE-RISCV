@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::error::Error;
 use pointers_utility::{ptr_byte_add_mut, ptr_byte_offset};
+use super::MemoryLayout;
 
 /// The wrapper over a raw pointer that is guaranteed to be an address located in the confidential memory region.
 #[repr(transparent)]
@@ -23,39 +24,61 @@ pub struct ConfidentialMemoryAddress(#[rr::field("l")] *mut usize);
 /// Verification: We require the ghost state for the global memory layout to be available.
 #[rr::context("onceG Σ memory_layout")]
 impl ConfidentialMemoryAddress {
+    // !start spec(confidential_memory_address.new)
     #[rr::params("MEMORY_CONFIG")]
     /// Precondition: The global memory layout is initialized.
     #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     /// Precondition: The address is in the confidential region of the global memory layout.
     #[rr::requires("(MEMORY_CONFIG.(conf_start).(loc_a) ≤ address.(loc_a) < MEMORY_CONFIG.(conf_end).(loc_a))%Z")]
     #[rr::returns("address")]
+    // !end spec
     // TODO this should be unsafe
+    // !start code(confidential_memory_address.new)
     pub(super) fn new(address: *mut usize) -> Self {
         Self(address)
     }
+    // !end code
 
+    // !start spec(confidential_memory_address.to_ptr)
     #[rr::returns("self")]
+    // !end spec
+    // !start code(confidential_memory_address.to_ptr)
     pub fn to_ptr(&self) -> *const u8 {
         self.0 as *const u8
     }
+    // !end code
 
+
+    // !start spec(confidential_memory_address.as_usize)
     #[rr::returns("self.(loc_a)")]
+    // !end spec
+    // !start code(confidential_memory_address.as_usize)
     pub fn as_usize(&self) -> usize {
         self.0.addr()
     }
+    // !end code
 
-    #[rr::only_spec]
+    // !start spec(confidential_memory_address.is_aligned_to)
+    // Precondition: Theh alignment is a power of two.
+    #[rr::requires("is_power_of_two (Z.to_nat align)")]
     /// Postcondition: Verifies that the pointer is aligned to the given alignment.
     #[rr::returns("bool_decide (self `aligned_to` (Z.to_nat align))")]
+    // !end spec
+    // !start code(confidential_memory_address.is_aligned_to)
     pub fn is_aligned_to(&self, align: usize) -> bool {
         self.0.is_aligned_to(align)
     }
+    // !end code
 
     /// Postcondition: Compute the offset.
+    // !start spec(confidential_memory_address.offset_from)
     #[rr::returns("wrap_to_it (pointer.(loc_a) - self.(loc_a)) isize")]
+    // !end spec
+    // !start code(confidential_memory_address.offset_from)
     pub fn offset_from(&self, pointer: *const usize) -> isize {
         ptr_byte_offset(pointer, self.0)
     }
+    // !end code
 
     // !start spec(confidential_memory_address.add)
     /// Creates a new confidential memory address at given offset. Error is returned if the resulting address exceeds
@@ -64,11 +87,9 @@ impl ConfidentialMemoryAddress {
     /// # Safety
     ///
     /// The caller must ensure that the address at given offset is still within the confidential memory region.
-    // TODO: can we require the offset to be a multiple of usize? (woz: yes we can)
-    #[rr::only_spec]
     #[rr::params("MEMORY_CONFIG")]
     /// Precondition: The global memory layout is initialized.
-    #[rr::requires(#iris "once_status \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
+    #[rr::requires(#iris "once_initialized π \"MEMORY_LAYOUT\" (Some MEMORY_CONFIG)")]
     #[rr::ok]
     /// Precondition: The offset address is in the given range.
     #[rr::requires("self.(loc_a) + offset_in_bytes < upper_bound.(loc_a)")]
@@ -79,6 +100,8 @@ impl ConfidentialMemoryAddress {
     // !end spec
     // !start code(confidential_memory_address.add)
     pub fn add(&self, offset_in_bytes: usize, upper_bound: *const usize) -> Result<ConfidentialMemoryAddress, Error> {
+        let memory_layout = MemoryLayout::read();
+        ensure!(upper_bound <= memory_layout.confidential_memory_end, Error::AddressNotInConfidentialMemory())?;
         let pointer = ptr_byte_add_mut(self.0, offset_in_bytes, upper_bound).map_err(
             #[rr::verify]
             |_| Error::AddressNotInConfidentialMemory(),

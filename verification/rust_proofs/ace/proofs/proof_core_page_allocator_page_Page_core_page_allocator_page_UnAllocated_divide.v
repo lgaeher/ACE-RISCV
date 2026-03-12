@@ -58,6 +58,7 @@ Proof.
 
   repeat liRStep; liShow.
   liInst Hevar_Inv INV.
+  liInst Hevar_ParamPred (λ _ _, True).
 
   (* Prove initialization of the invariant *)
   unfold INV at 1.
@@ -109,7 +110,7 @@ Proof.
     destruct len. { exfalso. move: Hcmp_eq Heq_len Hstart Hend. lia. }
     iDestruct "Hinv" as "(#Hinv0 & Hinv1 & Hinv)".
     fold seq.
-    iExists ( *[take (page_size_in_words_nat smaller_sz) (drop (Z.to_nat istart * page_size_in_words_nat smaller_sz) pageval)]).
+    iExists ( *[take (page_size_in_words_nat smaller_sz) (drop (Z.to_nat istart * page_size_in_words_nat smaller_sz) pageval)]). iR.
     iSplitL "Hinv0 Hinv1".
     { iExists _, istart, inhabitant, _, _, _, _. iR. iR. iR.
       unfold name_hint. iFrame "#".
@@ -160,11 +161,15 @@ Proof.
     injection Ha as <-.
     iIntros "Hinv". iL. done.
   }
-  rep <-! liRStep. 
+  rep <-! liRStep.
+  rep liRStep; liShow.
+  liInst Hevar_x l3.
+  rep liRStep; liShow.
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   Unshelve. all: sidecond_hammer.
+  all: try rename l3 into new_pages.
   - set (smaller_sz := (default self0 (page_size_smaller self0))).
     specialize (page_size_in_words_nat_ge smaller_sz).
     solve_goal.
@@ -175,6 +180,10 @@ Proof.
     rewrite (page_size_multiplier_quot_Z _ smaller_sz); last done.
     specialize (page_size_multiplier_in_usize self0). solve_goal.
   - rewrite page_size_multiplier_quot_Z; done.
+  - rewrite list_fmap_compose.
+    rewrite list_fmap_compose. rewrite snd_zip.
+    2: { opose proof (Forall2_length _ _ new_pages _) as Hlen; first done. clear -Hlen. lia. }
+    solve_goal.
   - (* TODO: let's look at these cached sideconditions and filter more.. *)
     rename select (Forall2 _ _ _) into Hclos.
     opose proof (Forall2_length _ _ _ Hclos) as Hlen.
@@ -182,7 +191,6 @@ Proof.
     rewrite page_size_multiplier_quot_Z in Hlen; last done.
     unfold subdivided_pages. simpl.
     split; first lia.
-    rename x' into new_pages.
     intros i p' Hlook.
     opose proof (Forall2_lookup_r _ _ _ i _ Hclos Hlook) as (j & Hlook2 & Ha).
     apply lookup_seqZ in Hlook2 as (-> & Hlook2).

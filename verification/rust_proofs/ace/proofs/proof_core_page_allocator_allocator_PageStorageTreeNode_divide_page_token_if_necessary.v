@@ -34,8 +34,8 @@ Proof.
   (* !start proof(page_allocator.divide_page_token_if_necessary) *)
   1: liInst Hevar_rf (mk_page_node self.(max_node_size) self.(base_address) (PageTokenPartiallyAvailable smaller_size) true).
   2: liInst Hevar_rf self.
-  (* !end proof *)
   all: repeat liRStep; liShow.
+  (* !end proof *)
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.

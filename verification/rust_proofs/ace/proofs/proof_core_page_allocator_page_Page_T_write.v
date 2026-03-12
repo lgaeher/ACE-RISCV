@@ -7,9 +7,6 @@ Set Default Proof Using "Type".
 Section proof.
 Context `{RRGS : !refinedrustGS Σ}.
 
-(*Global Instance bla_copy : Copyable (error_Error_ty <INST!>).*)
-(*Proof. apply _. Qed.*)
-
 Lemma core_page_allocator_page_Page_T_write_proof (π : thread_id) :
   core_page_allocator_page_Page_T_write_lemma π.
 Proof.

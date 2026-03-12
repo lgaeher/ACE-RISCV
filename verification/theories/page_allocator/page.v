@@ -661,6 +661,41 @@ Proof.
   f_equiv. by apply page_size_multiplier_align_log.
 Qed.
 
+Lemma page_size_in_words_is_power_of_two sz :
+  is_power_of_two (page_size_in_words_nat sz).
+Proof.
+  rewrite page_size_in_words_nat_unfold.
+  rewrite /page_size_in_words_nat_def.
+  assert (is_power_of_two 512).
+  { exists 9%nat. done. }
+  assert (is_power_of_two 256).
+  { exists 8%nat. done. }
+  assert (is_power_of_two 4).
+  { exists 2%nat. done. }
+  destruct sz.
+  all: repeat first [done | apply is_power_of_two_mult; split].
+Qed.
+Lemma page_size_in_bytes_is_power_of_two sz :
+  is_power_of_two (page_size_in_bytes_nat sz).
+Proof.
+  rewrite /page_size_in_bytes_nat.
+  apply is_power_of_two_mult.
+  split; last apply page_size_in_words_is_power_of_two.
+  exists 3%nat. done.
+Qed.
+Global Instance simpl_page_size_in_words_is_power_of_two sz :
+  SimplBoth (is_power_of_two (page_size_in_words_nat sz)) True.
+Proof.
+  rewrite /SimplBoth. split; first done.
+  intros. apply page_size_in_words_is_power_of_two.
+Qed.
+Global Instance simpl_page_size_in_bytes_is_power_of_two sz :
+  SimplBoth (is_power_of_two (page_size_in_bytes_nat sz)) True.
+Proof.
+  rewrite /SimplBoth. split; first done.
+  intros. apply page_size_in_bytes_is_power_of_two.
+Qed.
+
 Lemma page_size_multiplier_quot sz smaller_sz :
   smaller_sz = default sz (page_size_smaller sz) →
   page_size_multiplier sz = Z.to_nat (page_size_in_bytes_Z sz `quot` page_size_in_bytes_Z smaller_sz).
@@ -740,7 +775,6 @@ Qed.
 
 Global Arguments page_within_range : simpl never.
 Global Typeclasses Opaque page_within_range.
-(* !end spec *)
 
 
 
@@ -856,6 +890,7 @@ Proof.
   specialize (page_size_in_bytes_nat_ge p'.(page_sz)).
   nia.
 Qed.
+(* !end spec *)
 
 
 (** Stronger functional specification *)
@@ -991,6 +1026,7 @@ Qed.
 
 
 (** Lithium automation *)
+(* !start spec(page.page) *)
 Global Instance simpl_exist_page Q :
   SimplExist page Q (∃ (page_loc : loc) (page_sz : page_size) (page_val : list Z),
     Q (mk_page page_loc page_sz page_val)).
@@ -1032,3 +1068,4 @@ Global Instance simpl_both_page_size_larger_none sz :
 Proof.
   split; destruct sz; simpl; done.
 Qed.
+(* !end spec *)

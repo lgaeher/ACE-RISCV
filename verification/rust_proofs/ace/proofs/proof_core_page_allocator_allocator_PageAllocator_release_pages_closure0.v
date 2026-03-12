@@ -13,12 +13,15 @@ Proof.
   core_page_allocator_allocator_PageAllocator_release_pages_closure0_prelude.
 
   rep <-! liRStep; liShow.
+  (* !start proof(page_allocator.release_pages) *)
   apply_update (updateable_copy_lft "ulft2" "ulft_3").
   rep liRStep; liShow.
+  (* !end proof *)
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   Unshelve. all: sidecond_hammer.
+  (* !start proof(page_allocator.release_pages) *)
   all: try congruence.
   all: clear_layout.
   - rename select (max_node_size root_node = Size128TiB) into Hsz_root.
@@ -33,6 +36,7 @@ Proof.
     rename select (max_node_size _ = max_node_size root_node) into Hsz.
     rename select (max_node_size root_node = Size128TiB) into Hsz'.
     rewrite Hsz Hsz'. lia.
+  (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
 Qed.

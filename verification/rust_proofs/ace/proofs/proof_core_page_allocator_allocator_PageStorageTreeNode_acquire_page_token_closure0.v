@@ -17,12 +17,14 @@ Proof.
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   Unshelve. all: sidecond_hammer.
+  (* !start proof(page_allocator.acquire_page_token) *)
   { unfold page_node_can_allocate.
     opose proof* (page_storage_node_invariant_case_can_allocate) as Heq; first apply INV_CASE.
     rewrite -Heq. unfold page_node_can_allocate.
     unfold ord_le.
     split; solve_goal.
   }
+  (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
 Qed.

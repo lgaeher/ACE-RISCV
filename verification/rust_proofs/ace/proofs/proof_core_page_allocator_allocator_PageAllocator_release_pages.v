@@ -12,6 +12,7 @@ Lemma core_page_allocator_allocator_PageAllocator_release_pages_proof (π : thre
 Proof.
   core_page_allocator_allocator_PageAllocator_release_pages_prelude.
 
+  (* !start proof(page_allocator.release_pages) *)
   rep <-! liRStep; liShow.
   (* TODO: lots of spurious lifetimes, due to latebound instantiation (see #27) *)
   apply_update (updateable_copy_lft "vlft3" "static").
@@ -28,6 +29,7 @@ Proof.
   { rep liRStep.
     unfold once_initialized. rep liRStep. }
   rep liRStep.
+  (* !end proof *)
 
 
   all: print_remaining_goal.

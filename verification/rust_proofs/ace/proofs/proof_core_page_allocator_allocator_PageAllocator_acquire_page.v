@@ -13,6 +13,7 @@ Proof.
   core_page_allocator_allocator_PageAllocator_acquire_page_prelude.
 
   (* TODO: lots of spurious lifetimes, due to latebound instantiation (see #27) *)
+  (* !start proof(page_allocator.acquire_page) *)
   rep <-! liRStep; liShow.
   apply_update (updateable_copy_lft "vlft5" "static").
   rep <-! liRStep; liShow.
@@ -28,6 +29,7 @@ Proof.
   { rep liRStep.
     unfold once_initialized. rep liRStep. }
   rep liRStep.
+  (* !end proof *)
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
