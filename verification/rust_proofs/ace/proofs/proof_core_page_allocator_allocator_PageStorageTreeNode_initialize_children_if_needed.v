@@ -22,8 +22,6 @@ Proof.
       let '( *[i]) := i in
       p1 = child_base_address (base_address self) smaller_sz i ∧ p2 = smaller_sz).
     rep liRStep; liShow.
-    liInst Hevar_children l3.
-    rep liRStep.
     liInst Hevar_rf (mk_page_node self.(max_node_size) self.(base_address) self.(allocation_state) true).
     rep liRStep; liShow.
   }
@@ -53,21 +51,19 @@ Proof.
     { rewrite Hsmaller//. }
     unfold child_base_address. nia.
   - case_bool_decide; simplify_eq. lia.
-  - rewrite list_fmap_compose.
-    rewrite snd_zip; first done.
-    opose proof* Forall2_length as Hlen; first apply Hf.
-    lia.
-  - split; first last.
+  - rewrite snd_zip; first last.
+    { opose proof* Forall2_length as Hlen; first apply Hf. lia. }
+    split; first last.
     { rewrite Hsmaller. done. }
     intros child_sz Hsmaller' i child Hlook.
     opose proof * Forall2_lookup_r as Hlook'; [apply Hf | apply Hlook | ].
-    destruct Hlook' as (idx & Hlook_idx & idx' & Haddr & ? & ->).
+    destruct Hlook' as (idx & Hlook_idx & idx' & -> & Haddr & ?).
     apply lookup_seqZ in Hlook_idx as (-> & ?).
     simpl.
     split_and!.
     + simplify_eq. done.
-    + rewrite Haddr. simplify_eq. done.
-    + solve_goal.
+    + simplify_eq. done.
+    + subst. solve_goal.
   - eexists. done.
   - opose proof* Forall2_length as Hlen; first apply Hf.
     rewrite -Hlen.
@@ -76,10 +72,12 @@ Proof.
     lia.
   - (* reasoning:
        if children were empty before, then either there is no smaller page size or we are not in PartiallyAvailable state. So this is trivial *)
+    rewrite snd_zip; first last.
+    { opose proof* Forall2_length as Hlen; first apply Hf. lia. }
     move: INV_CASE.
     unfold page_storage_node_invariant_case.
     simpl. repeat case_decide; try done.
-    solve_goal.
+    all: solve_goal.
   - eexists. done.
   - destruct self as [??? children_init]. simpl in *.
     destruct children_init; done.

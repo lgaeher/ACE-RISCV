@@ -14,7 +14,7 @@ Proof.
 
   (* !start proof(page_allocator.find_largest_page_size) *)
   rep <-! liRStep; liShow.
-  apply_update (updateable_copy_lft "vlft6" "ulft1").
+  apply_update (updateable_copy_lft "vlft7" "ulft1").
   rep <-! liRStep; liShow.
   apply_update (updateable_copy_lft "ulft3" "ulft_4").
   rep <-! liRStep; liShow.

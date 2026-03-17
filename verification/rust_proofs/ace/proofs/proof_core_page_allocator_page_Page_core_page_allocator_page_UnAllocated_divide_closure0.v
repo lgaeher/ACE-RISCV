@@ -14,22 +14,18 @@ Proof.
 
   rep <-! liRStep; liShow.
   (* !start proof(page.divide) *)
-  apply_update (updateable_copy_lft "vlft7" "ulft5").
-  rep <-! liRStep; liShow.
-  apply_update (updateable_copy_lft "plft21" "vlft7").
-  rep <-! liRStep; liShow.
-  apply_update (updateable_copy_lft "vlft9" "ulft5").
-  rep <-! liRStep; liShow.
   apply_update (updateable_copy_lft "vlft11" "ulft5").
-  rep <-! liRStep; liShow.
-  apply_update (updateable_copy_lft "plft24" "vlft11").
-  rep <-! liRStep; liShow.
-  apply_update (updateable_copy_lft "plft22" "ulft5").
   rep <-! liRStep; liShow.
   apply_update (updateable_copy_lft "vlft29" "ulft5").
   rep <-! liRStep. liShow.
+  apply_update (updateable_copy_lft "vlft13" "ulft5").
+  rep <-! liRStep.
+  apply_update (updateable_copy_lft "vlft15" "ulft5").
+  rep <-! liRStep.
+  apply_update (updateable_copy_lft "plft28" "ulft5").
+  rep <-! liRStep.
   apply_update (updateable_copy_lft "vlft30" "ulft5").
-  rep liRStep.
+  rep <-! liRStep.
   (* !end proof *)
 
   all: print_remaining_goal.

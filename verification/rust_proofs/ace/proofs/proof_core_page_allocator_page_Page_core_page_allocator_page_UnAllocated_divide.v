@@ -135,7 +135,7 @@ Proof.
         rewrite (page_size_multiplier_size_in_bytes sz smaller_sz); last done.
         move: Hcmp_eq. clear. nia. }
       iSplitR. { iPureIntro. simpl. lia. }
-      rewrite Z2Nat.id; last lia. iL. done. }
+      rewrite Z2Nat.id; last lia. iR. iL. done. }
     iIntros (e' (capture_smaller_sz & capture_memlayout & capture_start & capture_end & [])).
     rewrite boringly_persistent_elim.
     iIntros "(%v' & %i & % & % & % & % & % & %Heq0 & %Heq1 & %Heq2 & (-> & %Heq3) & _)".
@@ -162,9 +162,6 @@ Proof.
     iIntros "Hinv". iL. done.
   }
   rep <-! liRStep.
-  rep liRStep; liShow.
-  liInst Hevar_x l3.
-  rep liRStep; liShow.
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
@@ -180,17 +177,15 @@ Proof.
     rewrite (page_size_multiplier_quot_Z _ smaller_sz); last done.
     specialize (page_size_multiplier_in_usize self0). solve_goal.
   - rewrite page_size_multiplier_quot_Z; done.
-  - rewrite list_fmap_compose.
-    rewrite list_fmap_compose. rewrite snd_zip.
-    2: { opose proof (Forall2_length _ _ new_pages _) as Hlen; first done. clear -Hlen. lia. }
-    solve_goal.
   - (* TODO: let's look at these cached sideconditions and filter more.. *)
     rename select (Forall2 _ _ _) into Hclos.
     opose proof (Forall2_length _ _ _ Hclos) as Hlen.
     rewrite length_seqZ in Hlen.
     rewrite page_size_multiplier_quot_Z in Hlen; last done.
-    unfold subdivided_pages. simpl.
-    split; first lia.
+    rewrite snd_zip. 
+    2: { rewrite -Hlen. rewrite page_size_multiplier_quot_Z; last done. solve_goal. }
+    unfold subdivided_pages. simpl. split.
+    { rewrite -Hlen. clear. lia. }
     intros i p' Hlook.
     opose proof (Forall2_lookup_r _ _ _ i _ Hclos Hlook) as (j & Hlook2 & Ha).
     apply lookup_seqZ in Hlook2 as (-> & Hlook2).

@@ -2,6 +2,7 @@
 // SPDX-FileContributor: Wojciech Ozga <woz@zurich.ibm.com>, IBM Research - Zurich
 // SPDX-License-Identifier: Apache-2.0
 #![rr::import("ace.theories.page_allocator", "page")]
+#![rr::import("ace.theories.base", "machine")]
 use crate::core::architecture::PageSize;
 use crate::core::control_data::{DigestType, MeasurementDigest};
 use crate::core::memory_layout::{ConfidentialMemoryAddress, MemoryLayout, NonConfidentialMemoryAddress};
@@ -44,6 +45,8 @@ impl PageState for Allocated {}
 /// Invariant: ...and according to that layout, this page resides in confidential memory.
 #[rr::invariant("MEMORY_CONFIG.(conf_start).(loc_a) ≤ p.(page_loc).(loc_a)")]
 #[rr::invariant("p.(page_loc).(loc_a) + (page_size_in_bytes_nat p.(page_sz)) ≤ MEMORY_CONFIG.(conf_end).(loc_a)")]
+#[rr::context("MachineConfig")]
+#[rr::invariant("p.(page_loc).(loc_p) = ProvAlloc machine_memory_prov")]
 // !end spec
 pub struct Page<S: PageState> {
     /// Specification: the `address` has mathematical value `l`.
@@ -64,6 +67,7 @@ pub struct Page<S: PageState> {
 }
 
 #[rr::context("onceG Σ memory_layout")]
+#[rr::context("MachineConfig")]
 impl Page<UnAllocated> {
     // !start spec(page.init)
     /// Creates a page token at the given address in the confidential memory.
@@ -90,6 +94,8 @@ impl Page<UnAllocated> {
     /// Precondition: The page is entirely contained in the confidential memory range.
     #[rr::requires("MEMORY_CONFIG.(conf_start).(loc_a) ≤ l.(loc_a)")]
     #[rr::requires("l.(loc_a) + (page_size_in_bytes_nat sz) ≤ MEMORY_CONFIG.(conf_end).(loc_a)")]
+    /// Precondition: This needs to have the machine provenance.
+    #[rr::requires("l.(loc_p) = ProvAlloc machine_memory_prov")]
     /// Then, we get a properly initialized page starting at `l` of size `sz` with some value `v`.
     #[rr::returns("mk_page l sz v")]
     // !end spec
@@ -178,6 +184,8 @@ impl Page<UnAllocated> {
                 // Precondition: the offset is within the bound
                 #[rr::requires("Hinrange" : "{self.address}.(loc_a) + (1 + i) * (page_size_in_bytes_Z {smaller_page_size}) ≤ {page_end}.(loc_a)")]
                 #[rr::requires("Hinrange2" : "{page_end}.(loc_a) ≤ MAX_PAGE_ADDR")]
+                /// Precondition: provenance
+                #[rr::requires("{self.address}.(loc_p) = ProvAlloc machine_memory_prov")]
                 // Precondition: ownership of this token's memory region
                 #[rr::requires(#type "({self.address} +ₗ (i * page_size_in_bytes_Z {smaller_page_size}))" : "<#> v" @ "array_t (page_size_in_words_nat {smaller_page_size}) (int usize)")]
                 // Postcondition: return new smaller page
@@ -242,6 +250,7 @@ impl Page<UnAllocated> {
 }
 
 #[rr::context("onceG Σ memory_layout")]
+#[rr::context("MachineConfig")]
 impl Page<Allocated> {
     // !start spec(page.deallocate)
     /// Clears the entire memory content by writing 0s to it and then converts the Page from Allocated to UnAllocated so it can be returned
@@ -300,6 +309,7 @@ impl Page<Allocated> {
 }
 
 #[rr::context("onceG Σ memory_layout")]
+#[rr::context("MachineConfig")]
 impl<T: PageState> Page<T> {
     pub const ENTRY_SIZE: usize = mem::size_of::<usize>();
 

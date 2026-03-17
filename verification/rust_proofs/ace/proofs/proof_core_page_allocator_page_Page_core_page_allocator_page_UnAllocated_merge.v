@@ -8,20 +8,20 @@ Section proof.
 Context `{RRGS : !refinedrustGS Σ}.
 
 (* !start proof(page.merge) *)
-Lemma extract_page_token_invariants `{!onceG Σ memory_layout} {S_rt : RT} (S_attrs : core_page_allocator_page_PageState_spec_attrs S_rt) (S_ty : type S_rt) π xs xs' F :
+Lemma extract_page_token_invariants `{!onceG Σ memory_layout} `{!MachineConfig} {S_rt : RT} (S_attrs : core_page_allocator_page_PageState_spec_attrs S_rt) (S_ty : type S_rt) π xs xs' F :
   lftE ⊆ F →
   ([∗ list] x1; x2 ∈ xs'; xs, (core_page_allocator_page_Page_inv_t_inv_spec S_rt S_attrs <TY> S_ty <INST!>).(inv_P) π x1 x2) ={F}=∗
-  ([∗ list] p ∈ xs, p.(page_loc) ◁ₗ[π, Owned] # (<#> p.(page_val)) @ ◁ array_t (page_size_in_words_nat p.(page_sz)) (int usize)).
+  ([∗ list] p ∈ xs, ⌜p.(page_loc).(loc_p) = ProvAlloc machine_memory_prov⌝ ∗ p.(page_loc) ◁ₗ[π, Owned] # (<#> p.(page_val)) @ ◁ array_t (page_size_in_words_nat p.(page_sz)) (int usize)).
 Proof.
   iIntros (?) "Ha".
   iApply big_sepL_fupd.
   iApply (big_sepL2_elim_l xs').
   iApply (big_sepL2_impl with "Ha").
   iModIntro. iIntros (? inner pg Hlook1 Hlook2) "Hinv".
-  simpl. iDestruct "Hinv" as "(%MEM & -> & Hpg & _)".
+  simpl. iDestruct "Hinv" as "(%MEM & -> & Hpg & % & % & ? & % & % & % & _)".
   rewrite /guarded. iDestruct "Hpg" as "(((Hc1 & _) & _)& Hpg)".
   iApply (lc_fupd_add_later with "Hc1"). iNext.
-  by iFrame.
+  iR. by iFrame.
 Qed.
 (* !end proof *)
 
@@ -63,13 +63,25 @@ Proof.
     apply Hlook in Hlook_pg0 as [Hsz0 _]. simpl in Hsz0.
     rewrite Hsz0. lia. }
   { rewrite big_sepL_fmap. iApply (big_sepL_impl with "Harrs").
-    iModIntro. iIntros (?? Hlook').
+    iModIntro. iIntros (? pg' Hlook').
     apply Hlook in Hlook'.
-
-    (* TODO: provenance is problematic.
-       Probably for now we should assume a fixed "hardware provenance". Page token invariant says that the prov is fixed to that.
-    *)
-    admit. }
+    iIntros "(%Hprov & Hb)".
+    destruct Hlook' as [-> Hloc_eq].
+    revert select (loc_p (page_loc (from_pages !!! 0%nat)) = ProvAlloc machine_memory_prov).
+    move: Hloc_eq. erewrite list_lookup_total_correct; last done.
+    simpl. apply Hlook in Hlook_pg0 as [Hsz_0 Hloc_0].
+    simpl in Hsz_0. rewrite Hsz_0. 
+    intros Heq_a Heq_prov.
+    enough (page_loc pg' = (pg_loc_0 offsetst{IntSynType usize}ₗ (k * page_size_in_words_nat smaller_sz))) as -> by done.
+    move: Hprov Heq_a Heq_prov. destruct (page_loc pg'); simpl.
+    intros -> ->.
+    destruct pg_loc_0; simpl. intros ->. 
+    rewrite /OffsetLocSt /offset_loc/use_layout_alg'/=.
+    rewrite /shift_loc.
+    erewrite syn_type_has_layout_int; last done.
+    simpl. 
+    rewrite /page_size_in_bytes_nat bytes_per_int_usize.
+    f_equiv. lia. }
   repeat iClear select (page_loc (from_pages !!! Z.to_nat 0) ◁ₗ[ π, Shared _] _ @ _)%I.
   iModIntro.
   rep liRStep; liShow.
@@ -146,10 +158,13 @@ Proof.
     simpl.
     rewrite (page_size_multiplier_size_in_bytes new_size smaller_sz); last by rewrite Hsmaller.
     simpl. rewrite Hlast_sz. clear. nia.
+  - revert select (loc_p (page_loc (from_pages !!! 0%nat)) = ProvAlloc machine_memory_prov).
+    erewrite list_lookup_total_correct; last done.
+    done.
   - erewrite list_lookup_total_correct; last done.
     done.
   (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
-Qed.
+Admitted. (* admitted due to long Qed *)
 End proof.

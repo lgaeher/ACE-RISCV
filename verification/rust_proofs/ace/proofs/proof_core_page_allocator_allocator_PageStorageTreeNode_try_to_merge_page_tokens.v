@@ -30,11 +30,26 @@ Proof.
   iPoseProof (iterator_next_fused_trans_map_inv with "Hiter") as "Hiter".
   simpl.
   set (new_children := (fmap (λ child, {| max_node_size := max_node_size child; base_address := base_address child; allocation_state := PageTokenUnavailable; children_initialized := children_initialized child |}) x')).
-  iAssert (ObsList x'0 new_children)%I with "[Hiter]" as "Hobs" .
-  { admit. }
+  iApply updateable_add_fupd.
+  iAssert (|={⊤}=> ObsList x'0 new_children)%I with "[Hiter]" as "Hobs" .
+  { iDestruct "Hiter" as "(%hist' & % & _ & _ & _ & Hiter & Hpred)".
+    iMod (learn_from_hyp_proof with "[] Hiter") as "(_ & Hb)"; first done.
+    simpl. rewrite right_id. iDestruct "Hb" as "<-".
+    rewrite big_sepL2_fmap_r.
+    (* TODO: we should simplify Hpred using some big_sepL2 simplification machinery similar to the Forall2 machinery *)
+    iPoseProof (big_sepL2_impl _ (λ _ child _,
+      Obs child.2 {| max_node_size := max_node_size child.1; base_address := base_address child.1; allocation_state := PageTokenUnavailable; children_initialized := children_initialized child.1 |}) with "Hpred []")%I as "Ha".
+    { iModIntro. iIntros (? ? ???). iIntros "(% & % & % & % & % & _ & _ & %child & % & -> & -> & %Heq & (%ret & <- & % & % & Hobs & ->) & _)".
+      injection Heq. intros ->. done. }
+    iPoseProof (big_sepL2_elim_r with "Ha") as "Ha".
+    (*iPoseProof (big_sepL2_from_zip with "Ha") as "Ha".*)
+    rewrite /ObsList. 
+    iApply big_sepL2_from_zip. { rewrite /new_children length_fmap//. }
+    rewrite zip_flip big_sepL_fmap. rewrite zip_fmap_r big_sepL_fmap.
+    iApply (big_sepL_impl with "Ha").
+    iModIntro. iModIntro. iIntros (? [] ?). simpl. eauto. }
+  iMod "Hobs". iModIntro.
 
-  rep liRStep; liShow.
-  liInst Hevar_x0 l3.
   rep liRStep; liShow.
   liInst Hevar_rf (mk_page_node self.(max_node_size) self.(base_address) PageTokenAvailable true).
   rep liRStep; liShow.
@@ -46,27 +61,27 @@ Proof.
   all: try rename l3 into tokens.
   all: try rename select (Forall2 _ _ tokens) into Hf.
   all: rewrite Hchild_init in INV_INIT_CHILDREN.
+  all: try (opose proof * Forall2_length as Hlen; first apply Hf).
   - eexists. done.
   - move: INV_CASE.
     rename select (children_initialized self = true) into Hchild_init.
     destruct self. simpl in *.
     rewrite Hchild_init. done.
-  - rewrite list_fmap_compose.
-    rewrite list_fmap_compose.
-    apply list_fmap_ext'; first done.
-    normalize_and_simpl_goal.
-    rename select (Forall2 _ _ tokens) into Hf.
-    apply Forall2_length in Hf.
-    clear -Hf.
-    rewrite snd_zip; first done.
-    lia.
-  - opose proof* Forall2_length as Hlen; first apply Hf.
-    rewrite -Hlen length_zip. lia.
-  - opose proof* Forall2_length as Hlen; first apply Hf.
-    rewrite length_zip Nat.min_l in Hlen; last lia.
+  (*- rewrite list_fmap_compose.*)
+    (*rewrite list_fmap_compose.*)
+    (*apply list_fmap_ext'; first done.*)
+    (*normalize_and_simpl_goal.*)
+    (*rename select (Forall2 _ _ tokens) into Hf.*)
+    (*apply Forall2_length in Hf.*)
+    (*clear -Hf.*)
+    (*rewrite snd_zip; first done.*)
+    (*lia.*)
+  - rewrite -Hlen length_zip. lia.
+  - rewrite length_zip Nat.min_l in Hlen; last lia.
     specialize (page_size_multiplier_ge (max_node_size self)) as Hge.
     odestruct (lookup_lt_is_Some_2 tokens 0 _) as (tok0 & Hlook_tok0).
     { lia. }
+    rewrite snd_zip; last solve_goal.
     erewrite list_lookup_total_correct; last done.
     opose proof* Forall2_lookup_r as Hlook1; [apply Hf | apply Hlook_tok0 | ].
     destruct Hlook1 as ([child_node0 ?] & Hlook_child & _ & Hsz & Hloc).
@@ -80,8 +95,8 @@ Proof.
     rewrite /child_base_address/=.
     rewrite Z.mul_0_r Z.add_0_r.
     eexists. done.
-  -
-    rename select (tokens !! i = Some pg) into Htok_i.
+  - rename select (_ !! i = Some pg) into Htok_i.
+    rewrite snd_zip in Htok_i; last lia.
     opose proof* Forall2_lookup_r as Hlook1; [apply Hf | apply Htok_i | ].
     destruct Hlook1 as ([child_node ?] & Hlook_child & _ & Hsz & Hloc).
     apply lookup_zip_Some in Hlook_child as [Hlook_child _].
@@ -90,17 +105,18 @@ Proof.
     destruct Hchild as (Hchild_sz & Hchild_addr & _).
     rewrite Hsz Hchild_sz//.
   - (* use invariant *)
-    opose proof* Forall2_length as Hlen; first apply Hf.
     rewrite length_zip Nat.min_l in Hlen; last lia.
     specialize (page_size_multiplier_ge (max_node_size self)) as Hge.
     odestruct (lookup_lt_is_Some_2 tokens 0 _) as (tok0 & Hlook_tok0).
     { lia. }
+    rewrite snd_zip; last solve_goal.
     erewrite list_lookup_total_correct; last done.
     opose proof* Forall2_lookup_r as Hlook1; [apply Hf | apply Hlook_tok0 | ].
     destruct Hlook1 as ([child_node0 ?] & Hlook_child & _ & Hsz & Hloc).
     apply lookup_zip_Some in Hlook_child as [Hlook_child _].
 
-    rename select (tokens !! i = Some _) into Htok_i.
+    rename select (_ !! i = Some _) into Htok_i.
+    rewrite snd_zip in Htok_i; last solve_goal.
     opose proof* Forall2_lookup_r as Hlook2; [apply Hf | apply Htok_i | ].
     destruct Hlook2 as ([child_nodei ?] & Hlook_child_i & _ & Hsz' & Hloc').
     apply lookup_zip_Some in Hlook_child_i as [Hlook_child_i _].
@@ -123,11 +139,11 @@ Proof.
   - rewrite /new_children length_fmap//.
   - rewrite /page_storage_node_invariant_case/=.
     eexists. split_and!; try done. simpl.
-    opose proof* Forall2_length as Hlen; first apply Hf.
     rewrite length_zip Nat.min_l in Hlen; last lia.
     specialize (page_size_multiplier_ge (max_node_size self)) as Hge.
     odestruct (lookup_lt_is_Some_2 tokens 0 _) as (tok0 & Hlook_tok0).
     { lia. }
+    rewrite snd_zip; last solve_goal.
     erewrite list_lookup_total_correct; last done.
     opose proof* Forall2_lookup_r as Hlook1; [apply Hf | apply Hlook_tok0 | ].
     destruct Hlook1 as ([child_node0 ?] & Hlook_child & _ & Hsz & Hloc).

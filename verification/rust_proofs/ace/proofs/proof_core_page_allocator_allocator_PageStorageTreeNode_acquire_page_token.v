@@ -29,7 +29,7 @@ Proof.
   destruct (max_alloc ≫= id) as [max_alloc' | ] eqn:Heq; simpl.
   - apply bind_Some in Heq as (? & -> & Heq). simpl in Heq. subst.
     unfold page_storage_node_invariant_case; simpl.
-    destruct (max_list_cmp_elem_of (option_cmp page_size_cmp) (page_node_can_allocate <$> children) None) as [Hdef | Hel]; first congruence.
+    destruct (max_list_cmp_elem_of (cmp:=option_cmp page_size_cmp) (page_node_can_allocate <$> children) None) as [Hdef | Hel]; first congruence.
     destruct Hel as (ps & Hmax & Hel).
     apply list_elem_of_fmap in Hel as (child & -> & Hel).
     rewrite Hmax in Hmaxs. simplify_eq.
@@ -108,7 +108,7 @@ Proof.
   rep <-! liRStep. liShow.
 
   set (nodes := (<[Z.to_nat z:=x'2]> (x' ++ e :: x'1))).
-  set (max_allocs := ((λ '(a0, _), page_node_can_allocate a0) <$> zip nodes (replicate (length x' + S (length x'1)) ()))).
+  set (max_allocs := ((λ p, page_node_can_allocate p.1) <$> zip nodes (replicate (length x' + S (length x'1)) ()))).
   set (max_alloc := max_list_cmp (option_cmp page_size_cmp) max_allocs None).
   set (new_state := match max_alloc ≫= id with | Some max => PageTokenPartiallyAvailable max | None => PageTokenUnavailable end).
   repeat liRStep.

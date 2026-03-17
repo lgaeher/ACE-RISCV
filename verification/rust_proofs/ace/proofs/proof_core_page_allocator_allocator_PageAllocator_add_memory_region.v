@@ -44,9 +44,8 @@ Proof.
   Unshelve. all: sidecond_solver.
   Unshelve. all: try lia.
   all: try congruence.
-  - rewrite -page_size_align_is_size /page_size_align.
-    exists (page_size_align_log Size4KiB). lia.
-  - sidecond_hammer.
+  - apply page_size_in_bytes_is_power_of_two.
+  - solve_goal.
   - specialize (page_size_in_bytes_nat_ge x').
     specialize (page_size_in_bytes_nat_in_usize x') as [].
     split; lia.

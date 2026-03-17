@@ -29,6 +29,7 @@ static PAGE_ALLOCATOR: Once<RwLock<PageAllocator>> = Once::new();
 /// Specification:
 #[rr::refined_by("()" : "unit")]
 #[rr::context("onceG Σ memory_layout")]
+#[rr::context("MachineConfig")]
 /// Invariant: We abstract over the root node
 #[rr::exists("node" : "page_storage_node", "base_addr" : "Z", "node_size" : "page_size")]
 /// Invariant: the allocator tree covers the first 128TiB of memory
@@ -55,6 +56,7 @@ pub struct PageAllocator {
 
 #[rr::context("onceG Σ memory_layout")]
 #[rr::context("onceG Σ unit")]
+#[rr::context("MachineConfig")]
 impl PageAllocator {
     const NOT_INITIALIZED: &'static str = "Bug. Page allocator not initialized.";
 
@@ -69,6 +71,7 @@ impl PageAllocator {
     /// # Safety
     ///
     /// Caller must pass the ownership of the memory region [memory_start, memory_end).
+    #[rr::only_spec]
     #[rr::params("vs", "MEMORY_CONFIG")]
     /// Precondition: The start and end addresses need to be aligned to the minimum page size.
     #[rr::requires("memory_start `aligned_to` (page_size_in_bytes_nat Size4KiB)")]
@@ -78,6 +81,8 @@ impl PageAllocator {
 
     /// Precondition: The memory range is within the region covered by the page allocator.
     #[rr::requires("memory_end.(loc_a) ≤ page_size_in_bytes_Z Size128TiB")]
+    /// Precondition: The pointer has valid provenance to access machine memory.
+    #[rr::requires("memory_start.(loc_p) = ProvAlloc machine_memory_prov")]
 
     /// Precondition: We have ownership of the memory range, having (memory_end - memory_start) bytes.
     #[rr::requires(#type "memory_start" : "<#> vs" @ "array_t (Z.to_nat (memory_end.(loc_a) - memory_start.(loc_a))) (int u8)")]
@@ -185,6 +190,8 @@ impl PageAllocator {
     #[rr::requires("Hend_aligned" : "memory_region_end `aligned_to` (page_size_in_bytes_nat Size4KiB)")]
     /// Precondition: The memory range is positive.
     #[rr::requires("Hstart_lt" : "memory_region_start.(loc_a) < memory_region_end.(loc_a)")]
+    /// Precondition: The pointer has valid provenance to access machine memory.
+    #[rr::requires("memory_region_start.(loc_p) = ProvAlloc machine_memory_prov")]
 
     /// Precondition: We have ownership of the memory range, having (mend - mstart) bytes.
     #[rr::requires(#type "memory_region_start" : "<#> vs" @ "array_t (Z.to_nat (memory_region_end.(loc_a) - memory_region_start.(loc_a))) (int u8)")]
@@ -246,6 +253,7 @@ impl PageAllocator {
             #[rr::inv("address `aligned_to` page_size_in_bytes_nat page_size")]
             #[rr::inv("memory_region_start.(loc_a) ≤ address.(loc_a)")]
             #[rr::inv("address.(loc_a) < memory_region_end.(loc_a)")]
+            #[rr::inv("address.(loc_p) = ProvAlloc machine_memory_prov")]
             // Invariant: the borrow variable stays the same, but we do not track the state of the node
             #[rr::inv("γ = node.ghost")]
             // Invariant: the base address and node size stay unchanged
@@ -380,6 +388,7 @@ impl PageAllocator {
 /// release of page tokens.
 /// Specification:
 #[rr::context("onceG Σ memory_layout")]
+#[rr::context("MachineConfig")]
 #[rr::refined_by("node" : "page_storage_node")]
 /// We abstract over the components stored here
 #[rr::exists("max_sz" : "option page_size")]
@@ -406,6 +415,7 @@ struct PageStorageTreeNode {
 }
 
 #[rr::context("onceG Σ memory_layout")]
+#[rr::context("MachineConfig")]
 impl PageStorageTreeNode {
     // !start spec(page_allocator.empty)
     /// Creates a new empty node with no allocation.
