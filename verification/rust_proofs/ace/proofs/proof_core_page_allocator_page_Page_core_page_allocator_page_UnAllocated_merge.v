@@ -166,5 +166,5 @@ Proof.
   (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
-Admitted. (* admitted due to long Qed *)
+Qed.
 End proof.
