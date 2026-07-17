@@ -28,6 +28,7 @@ pub fn ptr_byte_offset(pointer1: *const usize, pointer2: *const usize) -> isize 
 }
 // !end code
 
+// !start skip(pointers_utility.ptr_align)
 /// Aligns the pointer to specific size while making sure that the aligned pointer
 /// is still within the memory region owned by the original pointer. Check `ptr_byte_add_mut`
 /// to learn about guarantees for the returned pointer.
@@ -35,6 +36,7 @@ pub fn ptr_align(pointer: *mut usize, align_in_bytes: usize, owned_region_end: *
     let offset_to_align = pointer.align_offset(align_in_bytes) * size_of::<usize>();
     ptr_byte_add_mut(pointer, offset_to_align, owned_region_end)
 }
+// !end skip
 
 // !start spec(pointers_utility.ptr_byte_add_mut)
 /// Calculates the offset from a mutable raw pointer. This function guarantees that
