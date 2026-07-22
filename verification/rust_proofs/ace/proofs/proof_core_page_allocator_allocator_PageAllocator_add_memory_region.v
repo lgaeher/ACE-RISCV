@@ -73,6 +73,6 @@ Proof.
   (* !end proof *)
 
   Unshelve. all: print_remaining_sidecond.
-(*Qed.*)
-Admitted. (* admitted due to long Qed *)
+(* Qed. *)
+Admitted. (* Admitted due to long Qed. *)
 End proof.

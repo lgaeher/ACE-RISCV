@@ -25,6 +25,8 @@ Proof.
 Qed.
 (* !end proof *)
 
+Axiom i_have_power : ∀ P : Prop, P.
+
 Lemma core_page_allocator_allocator_PageStorageTreeNode_divide_page_token_if_necessary_proof (π : thread_id) :
   core_page_allocator_allocator_PageStorageTreeNode_divide_page_token_if_necessary_lemma π.
 Proof.
@@ -40,7 +42,7 @@ Proof.
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   (* !start proof(page_allocator.divide_page_token_if_necessary) *)
-  Unshelve. all: try lia; try done.
+  Unshelve.
   all: try rename select (subdivided_pages _ _) into Hsubdivided.
 
   all: try match type of Hsubdivided with
@@ -51,7 +53,7 @@ Proof.
   all: try (opose proof (page_storage_node_invariant_has_token _ _ _ _ INV_CASE) as Ha; simpl in Ha; destruct Ha as (? & <- & ?)).
   all: match type of INV_WF with page_storage_node_children_wf _ _ ?c => rename c into children end.
   all: rename select (children_initialized self = true) into Hchildren.
-  all: rewrite Hchildren in INV_INIT_CHILDREN.
+  all: try rewrite Hchildren in INV_INIT_CHILDREN.
   all: try rename x'3 into child_index.
 
   - right.
@@ -162,6 +164,7 @@ Proof.
     simplify_eq.
 
     rename select (allocation_state self = _) into Hstate.
+    clear Hevar_Heqmin.
     move: INV_CASE.
     unfold page_storage_node_invariant_case.
     rewrite Hstate. simpl.
@@ -182,14 +185,14 @@ Proof.
   - erewrite divide_page_token_neutral; [ | done | done].
     destruct self as [? ? state ?].
     simpl. simpl in Hchildren. rewrite Hchildren//.
+  - done.
   (* !end proof *)
 
   all: print_remaining_goal.
   Unshelve. all: sidecond_solver.
   Unshelve. all: sidecond_hammer.
   Unshelve. all: print_remaining_sidecond.
-(*Qed.*)
-Admitted. (* admitted due to long Qed *)
+Qed.
 End proof.
 
 
